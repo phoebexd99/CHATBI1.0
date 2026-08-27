@@ -10,6 +10,15 @@ A four-day, portfolio-grade conversational BI MVP for business operators who nee
 
 These labels are kept in repository documentation and code comments only; the product UI does not expose delivery-status labels.
 
+## One-command local development (tunneled Tencent Cloud PostgreSQL)
+
+After the first setup, use the idempotent PowerShell launcher so the SSH tunnel, API, and frontend do not need to be configured repeatedly:
+
+```powershell
+.\scripts\start-local.ps1
+```
+
+The one-time setup is `.\scripts\setup-local.ps1`; diagnostics are `.\scripts\check-local.ps1`; stop everything with `.\scripts\stop-local.ps1`. See [`docs/09-local-environment.md`](docs/09-local-environment.md). The tunnel keeps PostgreSQL bound to the server loopback interface and never opens database port 5432 publicly.
 ## Run locally without Docker
 
 Python 3.11–3.13 is recommended (the project also avoids version-specific features).
