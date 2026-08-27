@@ -54,6 +54,8 @@ def query(request: QueryRequest) -> dict:
     return {
         "question": request.question, "answer": result["answer"], "sql": result["sql"],
         "columns": result["columns"], "rows": result["rows"], "chart": result["chart_spec"],
+        "entities": result.get("entities", {}), "semantic_plan": result.get("semantic_plan").__dict__ if result.get("semantic_plan") else None,
+        "insight": result.get("insight", {}), "retrieval_summary": result.get("retrieval_summary", {}),
         "evidence": result["evidence"], "trace": result["trace"],
         "latency_ms": round((perf_counter() - started) * 1000, 2),
     }
