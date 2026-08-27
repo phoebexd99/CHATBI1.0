@@ -1,0 +1,47 @@
+[
+  {
+    "id": "metric.gmv",
+    "name": "GMV",
+    "display_name": "成交总额",
+    "description": "统计已支付及已退款订单的下单总金额，取消订单不计入；退款额不从 GMV 扣减。",
+    "formula": "SUM(orders.gross_amount) FILTER (WHERE status IN ('paid','refunded'))",
+    "grain": "order",
+    "dimensions": ["order_date", "region", "channel"],
+    "owner": "经营分析",
+    "certified": true
+  },
+  {
+    "id": "metric.net_revenue",
+    "name": "net_revenue",
+    "display_name": "净收入",
+    "description": "已支付及已退款订单的成交额减优惠与退款。",
+    "formula": "SUM(gross_amount - discount_amount - refund_amount)",
+    "grain": "order",
+    "dimensions": ["order_date", "region", "channel"],
+    "owner": "财务分析",
+    "certified": true
+  },
+  {
+    "id": "metric.order_count",
+    "name": "order_count",
+    "display_name": "有效订单数",
+    "description": "状态为已支付或已退款的去重订单数。",
+    "formula": "COUNT(DISTINCT order_id) WHERE status IN ('paid','refunded')",
+    "grain": "order",
+    "dimensions": ["order_date", "region", "channel"],
+    "owner": "经营分析",
+    "certified": true
+  },
+  {
+    "id": "metric.aov",
+    "name": "AOV",
+    "display_name": "客单价",
+    "description": "GMV 除以有效订单数。",
+    "formula": "GMV / NULLIF(order_count, 0)",
+    "grain": "order",
+    "dimensions": ["order_date", "region", "channel"],
+    "owner": "经营分析",
+    "certified": true
+  }
+]
+

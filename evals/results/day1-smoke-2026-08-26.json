@@ -1,0 +1,39 @@
+{
+  "run_id": "day1-smoke-2026-08-26",
+  "scope": "Day 1 vertical slice",
+  "environment": {
+    "python": "3.14.5",
+    "node": "24.15.0",
+    "database": "SQLite local fallback",
+    "docker_available": false,
+    "semantic_adapter": "local_certified_metric",
+    "langgraph": "0.6.11",
+    "sqlglot": "29.0.1"
+  },
+  "question_id": "G001",
+  "question": "最近 30 天 GMV 是多少？",
+  "result": {
+    "http_status": 200,
+    "answer": "最近 30 天 GMV 为 ¥23,200.00。",
+    "execution_result": 23200.0,
+    "retrieval_hit_at_3": true,
+    "sql_safe_and_executable": true,
+    "execution_accuracy": 1.0,
+    "end_to_end_correct": true,
+    "trace_nodes": 12,
+    "repair_count": 0,
+    "latency_ms_observed": 14.15
+  },
+  "automated_checks": {
+    "backend_tests_passed": 7,
+    "backend_tests_failed": 0,
+    "next_live_build": "passed",
+    "next_replay_export": "passed",
+    "pages_http_200": ["/", "/knowledge", "/evaluations"]
+  },
+  "limitations": [
+    "This is a smoke result, not the full 30-question evaluation.",
+    "PostgreSQL Compose could not be executed because Docker is not installed on the host.",
+    "Wren HTTP was not configured; the replaceable local certified-metric adapter was exercised."
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {"id":"schema.orders","type":"schema","title":"订单事实表","text":"orders 每行一笔订单。字段包括 order_id, customer_id, order_date, status, channel, region, gross_amount, discount_amount, refund_amount。日期字段为 order_date。","tags":["订单","schema","日期"]},
+  {"id":"schema.customers","type":"schema","title":"客户维表","text":"customers 每行一个客户，包含 customer_id, customer_name, region, signup_date。","tags":["客户","区域","schema"]},
+  {"id":"schema.products","type":"schema","title":"商品维表","text":"products 每行一个商品，包含 product_id, product_name, category, unit_price。","tags":["商品","品类","schema"]},
+  {"id":"metric.gmv","type":"metric","title":"认证指标：GMV","text":"GMV 又称成交总额，汇总 paid 和 refunded 状态订单的 gross_amount；cancelled 不计入，refund_amount 不从 GMV 扣减。支持按日期、区域和渠道切分。","tags":["GMV","成交总额","销售额"]},
+  {"id":"metric.net_revenue","type":"metric","title":"认证指标：净收入","text":"净收入为有效订单 gross_amount 减 discount_amount 再减 refund_amount。","tags":["净收入","收入","退款"]},
+  {"id":"metric.order_count","type":"metric","title":"认证指标：有效订单数","text":"有效订单数是 paid 或 refunded 状态下去重 order_id 数量。","tags":["订单数","有效订单"]},
+  {"id":"metric.aov","type":"metric","title":"认证指标：客单价","text":"客单价 AOV 等于 GMV 除以有效订单数。","tags":["客单价","AOV"]},
+  {"id":"term.recent_30d","type":"term","title":"业务术语：最近 30 天","text":"最近 30 天包含今天，过滤 order_date >= current_date - 29 days。MVP SQL 基线使用数据库日期函数。","tags":["最近30天","近30天","时间"]},
+  {"id":"term.valid_order","type":"term","title":"业务术语：有效订单","text":"有效订单包含 paid 和 refunded，不包含 cancelled。","tags":["有效订单","状态"]},
+  {"id":"verified.gmv_30d","type":"verified_nl_sql","title":"已验证问法：最近 30 天 GMV","text":"问题：最近 30 天 GMV 是多少？语义：按认证 GMV 口径，对最近 30 天有效订单汇总 gross_amount。","tags":["GMV","最近30天"],"sql":"SELECT ROUND(SUM(gross_amount), 2) AS gmv FROM orders WHERE status IN ('paid', 'refunded') AND order_date >= CURRENT_DATE - INTERVAL '29 days'"},
+  {"id":"verified.gmv_region","type":"verified_nl_sql","title":"已验证问法：分区域 GMV","text":"问题：最近 30 天各区域 GMV？语义：按 region 分组，使用认证 GMV 口径。","tags":["GMV","区域"],"sql":"SELECT region, ROUND(SUM(gross_amount), 2) AS gmv FROM orders WHERE status IN ('paid', 'refunded') AND order_date >= CURRENT_DATE - INTERVAL '29 days' GROUP BY region ORDER BY gmv DESC"}
+]
+

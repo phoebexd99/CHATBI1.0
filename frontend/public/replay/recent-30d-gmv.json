@@ -1,0 +1,19 @@
+{
+  "question": "最近 30 天 GMV 是多少？",
+  "answer": "最近 30 天 GMV 为 ¥23,200.00。",
+  "sql": "SELECT ROUND(SUM(gross_amount), 2) AS gmv FROM orders WHERE status IN ('paid', 'refunded') AND order_date >= DATE('now', '-29 days')",
+  "columns": ["gmv"],
+  "rows": [[23200]],
+  "chart": {"type": "metric", "x": null, "y": "gmv"},
+  "evidence": [
+    {"id":"metric.gmv","type":"metric","title":"认证指标：GMV","score":0.91,"keyword_score":0.88,"vector_score":0.94},
+    {"id":"verified.gmv_30d","type":"verified_nl_sql","title":"已验证问法：最近 30 天 GMV","score":0.87,"keyword_score":0.82,"vector_score":0.93},
+    {"id":"term.recent_30d","type":"term","title":"业务术语：最近 30 天","score":0.76,"keyword_score":0.79,"vector_score":0.72},
+    {"id":"schema.orders","type":"schema","title":"订单事实表","score":0.55,"keyword_score":0.51,"vector_score":0.60}
+  ],
+  "trace": [
+    {"node":"classify","status":"ok","duration_ms":0.06},{"node":"extract_entities","status":"ok","duration_ms":0.03},{"node":"check_ambiguity","status":"ok","duration_ms":0.01},{"node":"retrieve","status":"ok","duration_ms":1.84},{"node":"semantic_plan","status":"ok","duration_ms":0.02},{"node":"generate_sql","status":"ok","duration_ms":0.08},{"node":"safety","status":"ok","duration_ms":3.17},{"node":"dry_run","status":"ok","duration_ms":0.34},{"node":"repair_once","status":"ok","duration_ms":0.01},{"node":"execute","status":"ok","duration_ms":0.31},{"node":"chart","status":"ok","duration_ms":0.02},{"node":"insight","status":"ok","duration_ms":0.03}
+  ],
+  "latency_ms": 6.21
+}
+
