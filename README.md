@@ -1,6 +1,13 @@
 # CHATBI Portfolio Sprint MVP
 
-A four-day, portfolio-grade conversational BI MVP for business operators who need certified metrics without SQL. Day 1 provides a real thin vertical slice: Next.js UI → FastAPI → graph workflow → hybrid knowledge retrieval / Wren adapter → SQLGlot safety → PostgreSQL (plus SQLite local fallback).
+A four-day, portfolio-grade conversational BI MVP for business operators who need certified metrics without SQL. The current implementation provides a real vertical slice: Next.js UI → FastAPI/SSE → LangGraph workflow → hybrid knowledge retrieval / Wren adapter → SQLGlot safety → PostgreSQL (plus SQLite local fallback).
+
+## Current status (Day 3 baseline)
+
+- **Implemented:** real node-level SSE trace, metric and knowledge-answer paths, ambiguity/safety/off-domain failures with trace, comparison insights, searchable knowledge/evaluation centers, a reproducible 30-question evaluation runner, and GitHub Pages replay fixtures.
+- **Measured:** 30/30 Golden cases pass in the deterministic SQLite/local-adapter environment; clarification rate is 10% with 100% expected-clarification coverage, safety rejection is 100%, and retrieval hit@5 is 100%. See `evals/results/day3-full-2026-08-28.json`.
+- **Still simplified:** local deterministic retrieval features, local certified metric planning, deterministic insight/chart selection, and non-production synthetic data.
+- **Design-only:** production identity/RLS, pgvector ingestion and release management, production Wren deployment, OpenTelemetry export, and cloud rollout. See `docs/10-production-readiness.md`.
 
 ## Day 1 status
 
