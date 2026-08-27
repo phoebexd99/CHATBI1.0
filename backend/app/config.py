@@ -1,5 +1,23 @@
 from dataclasses import dataclass
 import os
+from pathlib import Path
+
+
+def _load_local_env() -> None:
+    """Load simple KEY=VALUE pairs without adding a dotenv runtime dependency."""
+    root = Path(__file__).resolve().parents[2]
+    env_file = root / ".env"
+    if not env_file.exists():
+        return
+    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_local_env()
 
 
 @dataclass(frozen=True)

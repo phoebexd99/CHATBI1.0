@@ -48,7 +48,10 @@ class Database:
             cursor = connection.execute(sql)
             columns = [item.name if hasattr(item, "name") else item[0] for item in cursor.description]
             raw_rows = cursor.fetchmany(max_rows)
-        rows = [[self._json_value(value) for value in row] for row in raw_rows]
+        if self.is_postgres:
+            rows = [[self._json_value(row[column]) for column in columns] for row in raw_rows]
+        else:
+            rows = [[self._json_value(value) for value in row] for row in raw_rows]
         return columns, rows
 
     @staticmethod
