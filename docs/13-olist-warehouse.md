@@ -33,11 +33,21 @@ python -m backend.scripts.load_olist --raw-dir D:\data\olist
 
 重复导入必须显式声明 `--replace`，因为它会清空专用 `chatbi_raw` 表后重载。脚本会自动应用 `data/postgres/003_olist_warehouse.sql`，并只加载实际存在的 CSV。
 
+## 接入真实库存快照
+
+Olist 本身没有库存数据。拿到脱敏 WMS/ERP 日快照后，文件至少需要以下字段：`snapshot_date`、`product_key`（或 `product_id`/`sku`）、`available_qty`；可选 `warehouse_key`、`source_record_id`。执行：
+
+```powershell
+python -m backend.scripts.load_inventory --csv D:\data\inventory\snapshot.csv --source wms_prod --replace
+```
+
+脚本会拒绝负库存、非法日期、空商品键和同一来源下同一商品/仓库/日期重复行；多仓同商品会在写入 `chatbi_mart.fct_inventory_snapshot` 前汇总。每次成功装载都会记录到 `chatbi_meta.data_quality_run`。
+
 ## 当前数据边界
 
 - 订单：可认证 `GMV`、订单数、商品数、客单、运费、支付金额、配送时效和评价。
 - 营销：可认证 MQL、closed deal、渠道转化和 seller LTV 关联；Olist 没有广告 spend，因此不能把 conversion 当作 ROAS。
-- 库存：只建立正式字段契约，不从订单反推可用库存。要填充它，需要只读 WMS/ERP 快照：`snapshot_date、product_key、available_qty、inventory_source`。
+- 库存：已建立正式字段契约和导入器，不从订单反推可用库存。要填充它，需要只读 WMS/ERP 快照：`snapshot_date、product_key、available_qty、inventory_source`；当前云端库存行数为 0，等待真实源文件。
 - 治理：`chatbi_meta.metric_registry`、`dataset_registry`、`verified_sql` 支持版本、负责人、审核、下线和血缘登记。
 
 ## 上云边界
