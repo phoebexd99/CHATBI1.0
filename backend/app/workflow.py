@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from time import perf_counter
+import re
 from typing import Any, Callable, Iterator, TypedDict
 
 from .db import Database
 from .retrieval import HybridRetriever
 from .safety import SQLSafetyGate, UnsafeSQL
+from .semantic import SemanticCatalog
 from .wren import SemanticPlan, WrenAdapter
 
 
@@ -59,11 +61,13 @@ class QueryWorkflow:
         "insight": "生成结论、洞察与证据链",
     }
 
-    def __init__(self, database: Database, retriever: HybridRetriever, wren: WrenAdapter, safety: SQLSafetyGate):
+    def __init__(self, database: Database, retriever: HybridRetriever, wren: WrenAdapter, safety: SQLSafetyGate, catalog: SemanticCatalog | None = None):
         self.database = database
         self.retriever = retriever
         self.wren = wren
         self.safety = safety
+        self.catalog = catalog or SemanticCatalog()
+        self._dimension_value_cache: dict[str, list[str]] = {}
         self._nodes = [
             ("classify", self._classify), ("extract_entities", self._extract_entities),
             ("check_ambiguity", self._check_ambiguity), ("retrieve", self._retrieve),
@@ -155,67 +159,93 @@ class QueryWorkflow:
             return {"intent": "unsafe_request", "failure_category": "unsafe_request"}
         if any(word in question for word in ("股票", "股价", "天气", "航班")):
             return {"intent": "off_domain", "failure_category": "off_domain"}
-        if question in {"表现怎么样？", "表现怎么样", "看一下数据"} or ("对比" in question and not any(word in lower for word in ("gmv", "成交总额", "销售额", "净收入", "订单数", "客单价"))):
+        matched_metric = self.catalog.match_metric(question)
+        if question in {"表现怎么样？", "表现怎么样", "看一下数据"} or ("对比" in question and not matched_metric):
             return {"intent": "ambiguous"}
         knowledge_markers = ("定义", "是什么？", "是什么", "是否", "包括", "日期字段")
         if any(marker in question for marker in knowledge_markers):
             return {"intent": "knowledge_query"}
-        metric_words = ("gmv", "成交总额", "销售额", "净收入", "收入", "订单数", "有效订单", "客单价", "aov", "退款金额", "退款", "销量", "数量")
-        return {"intent": "metric_query" if any(word in lower for word in metric_words) else "ambiguous"}
+        return {"intent": "metric_query" if matched_metric else "ambiguous"}
+
+    @staticmethod
+    def _extract_time_range(question: str) -> str:
+        if "去年同期" in question:
+            return "last_year_same_period"
+        if any(marker in question for marker in ("今天", "今日", "当前")):
+            return "today"
+        if "本周" in question:
+            return "this_week"
+        if "本月" in question:
+            return "this_month"
+        if "本季度" in question or "本季" in question:
+            return "this_quarter"
+        if "今年" in question or "本年" in question:
+            return "this_year"
+        days = None
+        day_match = re.search(r"(?:最近|近|过去)\s*(\d+)\s*天", question)
+        month_match = re.search(r"(?:最近|近|过去)\s*(\d+)\s*个?月", question)
+        if day_match:
+            days = int(day_match.group(1))
+        elif month_match:
+            days = int(month_match.group(1)) * 30
+        elif "两周" in question:
+            days = 14
+        if days:
+            return f"last_{days}_days_vs_previous" if "环比" in question else f"last_{days}_days"
+        return "all_time"
+
+    def _dimension_values(self, qualified_column: str) -> list[str]:
+        if qualified_column not in self._dimension_value_cache:
+            try:
+                self._dimension_value_cache[qualified_column] = self.database.distinct_values(qualified_column)
+            except Exception:
+                self._dimension_value_cache[qualified_column] = []
+        return self._dimension_value_cache[qualified_column]
+
+    def _asks_to_group(self, question: str, dimension_id: str) -> bool:
+        aliases = self.catalog.dimensions.get(dimension_id, {}).get("aliases", [])
+        prefixes = ("按", "各", "每", "不同", "分")
+        suffixes = ("排行", "排名", "对比", "分布", "趋势")
+        return any(
+            f"{prefix}{alias}" in question or f"{alias}{suffix}" in question
+            for alias in aliases
+            for prefix in prefixes
+            for suffix in suffixes
+        ) or (any(marker in question for marker in ("最高", "最低")) and any(alias in question for alias in aliases))
 
     def _extract_entities(self, state: QueryState) -> dict[str, Any]:
         question = state["question"]
-        lower = question.lower()
-        dimensions: list[str] = []
-        if "区域" in question:
-            dimensions.append("region")
-        if any(marker in question for marker in ("按渠道", "各渠道", "渠道看", "渠道对比")):
-            dimensions.append("channel")
-        if "每天" in question or "趋势" in question:
-            dimensions.append("order_date")
-        if "品类" in question:
-            dimensions.append("category")
+        matched_metric = self.catalog.match_metric(question)
+        metric_name = matched_metric or "gmv"
+        metric = self.catalog.metric(metric_name)
+        requested_dimensions = self.catalog.match_requested_dimensions(question)
+        if self.catalog.asks_for_time_series(question) and metric.time_dimension:
+            requested_dimensions.append(metric.time_dimension)
+        requested_dimensions = list(dict.fromkeys(requested_dimensions))
+        dimensions = [item for item in requested_dimensions if item in metric.dimensions]
+        unsupported_dimensions = [item for item in requested_dimensions if item not in metric.dimensions]
         filters: dict[str, Any] = {}
-        for key, labels in (("region", ("华东", "华南", "华北", "西南")), ("channel", ("抖音", "天猫", "小程序"))):
-            hits = [label for label in labels if label in question]
+        for key, column in metric.filter_columns.items():
+            hits = [value for value in self._dimension_values(column) if value and value in question]
             if hits:
-                filters[key] = hits[0] if len(hits) == 1 else hits
+                filters[key] = hits[0] if len(hits) == 1 else sorted(hits)
+                if len(hits) == 1 and key in dimensions and not self._asks_to_group(question, key):
+                    dimensions.remove(key)
                 if len(hits) > 1 and key not in dimensions:
                     dimensions.append(key)
-        metric = "gmv"
-        if "净收入" in question or "net_revenue" in lower:
-            metric = "net_revenue"
-        elif "订单数" in question or "有效订单" in question or "order_count" in lower:
-            metric = "order_count"
-        elif "客单价" in question or "aov" in lower:
-            metric = "aov"
-        elif "退款金额" in question:
-            metric = "refund_amount"
-        elif "销量" in question or "数量" in question:
-            metric = "quantity"
-        if "两周" in question or "14 天" in question or "14天" in question:
-            time_range = "last_14_days"
-        elif "7 天" in question or "7天" in question:
-            time_range = "last_7_days"
-        elif "本月" in question:
-            time_range = "this_month"
-        elif "去年同期" in question:
-            time_range = "last_year_same_period"
-        elif "30 天" in question or "30天" in question:
-            time_range = "last_30_days_vs_previous" if "环比" in question else "last_30_days"
-        else:
-            time_range = "all_time"
-        knowledge_target = {
-            "gmv": "metric.gmv", "net_revenue": "metric.net_revenue",
-            "order_count": "metric.order_count", "aov": "metric.aov",
-            "refund_amount": "schema.orders", "quantity": "schema.products",
-        }[metric]
+        time_range = self._extract_time_range(question)
+        knowledge_target = self.catalog.knowledge_id(metric_name)
         if "有效订单" in question and state.get("intent") == "knowledge_query":
             knowledge_target = "term.valid_order"
         if "订单表" in question or "日期字段" in question:
             knowledge_target = "schema.orders"
+        elif any(marker in question for marker in ("活动表", "投放数据", "营销数据")):
+            knowledge_target = "schema.campaign_daily"
+        elif any(marker in question for marker in ("库存表", "库存数据")):
+            knowledge_target = "schema.inventory_snapshots"
         return {"entities": {
-            "metric": metric, "dimensions": list(dict.fromkeys(dimensions)),
+            "metric": metric_name, "metric_recognized": bool(matched_metric),
+            "dimensions": list(dict.fromkeys(dimensions)), "unsupported_dimensions": unsupported_dimensions,
             "filters": filters, "time_range": time_range,
             "knowledge_target": knowledge_target,
         }}
@@ -224,7 +254,11 @@ class QueryWorkflow:
         if state.get("failure_category"):
             raise ValueError(state["failure_category"])
         entities = state.get("entities", {})
+        if entities.get("unsupported_dimensions"):
+            raise ValueError("unsupported_dimension")
         ambiguous = state.get("intent") == "ambiguous" or len(state["question"]) < 3
+        if state.get("intent") == "metric_query" and not entities.get("metric_recognized"):
+            ambiguous = True
         if state.get("intent") == "metric_query" and not entities.get("dimensions") and entities.get("time_range") == "all_time":
             ambiguous = True
         if ambiguous:
@@ -317,22 +351,35 @@ class QueryWorkflow:
 
         rows = state["rows"]
         metric = state["entities"]["metric"]
-        metric_names = {"gmv": "GMV", "net_revenue": "净收入", "order_count": "有效订单数", "aov": "客单价", "refund_amount": "退款金额", "quantity": "销量"}
-        metric_name = metric_names.get(metric, metric)
-        if state["entities"]["time_range"] == "last_30_days_vs_previous" and rows:
+        metric_name = self.catalog.display_name(metric)
+        unit = self.catalog.unit(metric)
+
+        def formatted(value: Any) -> str:
+            number = float(value or 0)
+            if unit == "currency":
+                return f"¥{number:,.2f}"
+            if unit == "percent":
+                return f"{number:,.2f}%"
+            if unit == "ratio":
+                return f"{number:,.2f}x"
+            suffix = {"count": " 个", "items": " 件", "people": " 人"}.get(unit, "")
+            return f"{number:,.2f}{suffix}"
+
+        if state["entities"]["time_range"].endswith("_vs_previous") and rows:
             values = {str(row[0]): float(row[1] or 0) for row in rows}
-            current = values.get("current_30d", 0)
-            previous = values.get("previous_30d", 0)
+            current_key = next((key for key in values if key.startswith("current_")), "current")
+            previous_key = next((key for key in values if key.startswith("previous_")), "previous")
+            current = values.get(current_key, 0)
+            previous = values.get(previous_key, 0)
             change = current - previous
             rate = change / previous * 100 if previous else None
             direction = "增长" if change >= 0 else "下降"
             rate_text = f"{abs(rate):.2f}%" if rate is not None else "不可计算"
-            answer = f"最近 30 天 {metric_name} 为 ¥{current:,.2f}，较上一周期{direction} {rate_text}。"
-            insight = {"title": "环比洞察", "summary": answer, "highlights": [f"本期：¥{current:,.2f}", f"上期：¥{previous:,.2f}", f"变化额：¥{change:,.2f}"]}
+            answer = f"本期{metric_name}为 {formatted(current)}，较上一周期{direction} {rate_text}。"
+            insight = {"title": "环比洞察", "summary": answer, "highlights": [f"本期：{formatted(current)}", f"上期：{formatted(previous)}", f"变化量：{formatted(change)}"]}
         elif len(state["columns"]) == 1 and rows:
             value = rows[0][0] or 0
-            unit = "笔" if metric == "order_count" else "件" if metric == "quantity" else ""
-            answer = f"{metric_name}为 {float(value):,.2f}{unit}。" if metric in {"order_count", "quantity"} else f"{metric_name}为 ¥{float(value):,.2f}。"
+            answer = f"{metric_name}为 {formatted(value)}。"
             insight = {"title": "核心指标", "summary": answer, "highlights": [f"口径：{metric_name}", "返回 1 个聚合结果", "已通过 SQL 安全门与数据库 dry-run"]}
         else:
             answer = f"查询返回 {len(rows)} 行结果，已按 {state['chart_spec']['y']} 生成可视化建议。"

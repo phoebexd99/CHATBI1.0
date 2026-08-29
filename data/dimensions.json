@@ -1,0 +1,7 @@
+[
+  {"id":"region","display_name":"区域","aliases":["区域","大区","地区"]},
+  {"id":"channel","display_name":"渠道","aliases":["渠道","平台"]},
+  {"id":"category","display_name":"品类","aliases":["品类","商品类别","类别"]},
+  {"id":"product","display_name":"商品","aliases":["按商品","各商品","商品排行","产品排行"]},
+  {"id":"campaign","display_name":"营销活动","aliases":["活动","广告活动","投放计划","营销活动"]}
+]

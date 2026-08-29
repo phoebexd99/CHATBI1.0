@@ -8,6 +8,9 @@ const seedItems: KnowledgeItem[] = [
   { id: "schema.orders", type: "schema", title: "订单事实表", text: "orders 每行一笔订单。字段包括 order_id, customer_id, order_date, status, channel, region, gross_amount, discount_amount, refund_amount。日期字段为 order_date。", tags: ["订单", "schema", "日期"] },
   { id: "term.valid_order", type: "term", title: "业务术语：有效订单", text: "有效订单包含 paid 和 refunded，不包含 cancelled。", tags: ["有效订单", "状态"] },
   { id: "verified.gmv_30d", type: "verified_nl_sql", title: "已验证问法：最近 30 天 GMV", text: "问题：最近 30 天 GMV 是多少？语义：按认证 GMV 口径，对最近 30 天有效订单汇总 gross_amount。", tags: ["GMV", "最近30天"], sql: "SELECT ROUND(SUM(gross_amount), 2) AS gmv FROM orders WHERE status IN ('paid', 'refunded')" },
+  { id: "metric.refund_rate", type: "metric", title: "认证指标：退款率", text: "退款率等于退款金额除以 GMV，按百分比展示，用于监控售后损失。", tags: ["退款率", "退款占比", "售后"] },
+  { id: "metric.roas", type: "metric", title: "认证指标：ROAS", text: "ROAS 等于归因收入除以广告花费；大于 1 表示归因收入高于投放成本，但不等同于利润。", tags: ["ROAS", "投产比", "营销"] },
+  { id: "metric.stockout_rate", type: "metric", title: "认证指标：缺货率", text: "缺货率等于缺货商品数除以库存快照中的商品总数。", tags: ["缺货率", "库存", "供应链"] },
 ];
 const typeLabels: Record<string, string> = { all: "全部", metric: "认证指标", schema: "Schema", term: "业务术语", verified_nl_sql: "验证问法" };
 

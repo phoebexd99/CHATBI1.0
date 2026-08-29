@@ -1,0 +1,9 @@
+[
+  {"id":"dataset.olist","type":"dataset","title":"Olist 脱敏电商数据集","text":"Olist 是公开的匿名化巴西电商数据，覆盖约 10 万订单、客户、商品、卖家、支付、评价和配送时间。订单事实粒度为 order，订单明细事实粒度为 order_item。","tags":["Olist","订单","客户","商品","支付","评价","脱敏"]},
+  {"id":"metric.olist_gmv","type":"metric","title":"Olist商品成交额口径","text":"Olist商品成交额为有效订单明细 price 之和，不含 freight_value；canceled 与 unavailable 订单排除。Olist原始数据没有退款流水，不能把该指标称为退款后收入。","tags":["Olist成交额","商品成交额","GMV","price"]},
+  {"id":"metric.olist_net_revenue","type":"metric","title":"Olist净收入口径","text":"Olist净收入当前按有效订单商品成交额计算，取消和 unavailable 订单排除。公开数据没有退款流水，因此不表达售后退款后的净收入。","tags":["Olist净收入","收入","退款"]},
+  {"id":"metric.olist_marketing_mql","type":"metric","title":"Olist营销线索口径","text":"Marketing Funnel 的 MQL 记录来自 first_contact_date、origin、landing_page_id；closed deals 通过 mql_id 关联 seller_id 和 won_date。","tags":["Olist MQL","营销线索","渠道","origin"]},
+  {"id":"metric.olist_marketing_conversion_rate","type":"metric","title":"Olist线索转化率口径","text":"Olist线索转化率为 closed deal MQL 数除以全部 MQL 数。它不是广告转化率，也不是 ROAS；公开 Olist Funnel 没有 spend 字段。","tags":["Olist转化率","线索转化率","ROAS","spend"]},
+  {"id":"schema.olist_inventory","type":"schema","title":"Olist库存数据边界","text":"Olist公开数据没有仓库在手库存或可用量快照。CHATBI 建立了 fct_inventory_snapshot 契约表，但在接入WMS/ERP前保持空表，不从订单量推导库存。","tags":["库存","WMS","ERP","available_qty"]},
+  {"id":"schema.olist_mart","type":"schema","title":"Olist Analytics Mart 分层","text":"chatbi_raw 保留源字段，chatbi_mart 提供 dim_customer、dim_product、dim_seller、fct_order、fct_order_item、fct_payment、fct_review 和 fct_marketing_lead；chatbi_meta 管理数据集、指标版本和 Verified SQL。","tags":["chatbi_raw","chatbi_mart","chatbi_meta","Analytics Mart"]}
+]

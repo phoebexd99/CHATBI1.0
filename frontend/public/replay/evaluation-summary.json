@@ -1,5 +1,5 @@
 {
-  "total": 30,
+  "total": 45,
   "questions": [
     {
       "id": "G001",
@@ -337,6 +337,7 @@
       ],
       "time_range": "all_time",
       "knowledge_ids": [
+        "metric.refund_amount",
         "schema.orders"
       ],
       "expected": "table_nonempty"
@@ -354,30 +355,228 @@
         "schema.products"
       ],
       "expected": "table_nonempty"
+    },
+    {
+      "id": "G031",
+      "question": "最近 30 天退款率是多少？",
+      "intent": "metric_query",
+      "metric": "refund_rate",
+      "dimensions": [],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.refund_rate"
+      ],
+      "expected": "scalar_positive"
+    },
+    {
+      "id": "G032",
+      "question": "最近 30 天各渠道退款率",
+      "intent": "metric_query",
+      "metric": "refund_rate",
+      "dimensions": [
+        "channel"
+      ],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.refund_rate"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G033",
+      "question": "本月优惠率是多少？",
+      "intent": "metric_query",
+      "metric": "discount_rate",
+      "dimensions": [],
+      "time_range": "this_month",
+      "knowledge_ids": [
+        "metric.discount_rate"
+      ],
+      "expected": "scalar_positive"
+    },
+    {
+      "id": "G034",
+      "question": "最近 30 天成交客户数",
+      "intent": "metric_query",
+      "metric": "customer_count",
+      "dimensions": [],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.customer_count"
+      ],
+      "expected": "scalar_positive"
+    },
+    {
+      "id": "G035",
+      "question": "最近 30 天各品类销量排行",
+      "intent": "metric_query",
+      "metric": "quantity",
+      "dimensions": [
+        "category"
+      ],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.quantity"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G036",
+      "question": "最近 30 天各活动下单转化率",
+      "intent": "metric_query",
+      "metric": "conversion_rate",
+      "dimensions": [
+        "campaign"
+      ],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.conversion_rate"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G037",
+      "question": "最近 30 天按渠道看广告花费",
+      "intent": "metric_query",
+      "metric": "marketing_spend",
+      "dimensions": [
+        "channel"
+      ],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.marketing_spend"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G038",
+      "question": "最近 30 天各活动归因收入",
+      "intent": "metric_query",
+      "metric": "attributed_revenue",
+      "dimensions": [
+        "campaign"
+      ],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.attributed_revenue"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G039",
+      "question": "最近 30 天各活动 ROAS 排名",
+      "intent": "metric_query",
+      "metric": "roas",
+      "dimensions": [
+        "campaign"
+      ],
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.roas",
+        "verified.campaign_roas"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G040",
+      "question": "开学季最近 30 天 ROAS",
+      "intent": "metric_query",
+      "metric": "roas",
+      "dimensions": [],
+      "filters": {
+        "campaign": "开学季"
+      },
+      "time_range": "last_30_days",
+      "knowledge_ids": [
+        "metric.roas"
+      ],
+      "expected": "scalar_positive"
+    },
+    {
+      "id": "G041",
+      "question": "今天各品类可用库存",
+      "intent": "metric_query",
+      "metric": "available_inventory",
+      "dimensions": [
+        "category"
+      ],
+      "time_range": "today",
+      "knowledge_ids": [
+        "metric.available_inventory",
+        "schema.inventory_snapshots"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G042",
+      "question": "今天缺货商品数",
+      "intent": "metric_query",
+      "metric": "stockout_product_count",
+      "dimensions": [],
+      "time_range": "today",
+      "knowledge_ids": [
+        "metric.stockout_product_count"
+      ],
+      "expected": "scalar"
+    },
+    {
+      "id": "G043",
+      "question": "今天各品类缺货率",
+      "intent": "metric_query",
+      "metric": "stockout_rate",
+      "dimensions": [
+        "category"
+      ],
+      "time_range": "today",
+      "knowledge_ids": [
+        "metric.stockout_rate",
+        "verified.inventory_stockout"
+      ],
+      "expected": "table_nonempty"
+    },
+    {
+      "id": "G044",
+      "question": "ROAS 的定义是什么？",
+      "intent": "knowledge_query",
+      "metric": "roas",
+      "knowledge_ids": [
+        "metric.roas"
+      ],
+      "expected": "definition"
+    },
+    {
+      "id": "G045",
+      "question": "下单转化率是什么？",
+      "intent": "knowledge_query",
+      "metric": "conversion_rate",
+      "knowledge_ids": [
+        "metric.conversion_rate"
+      ],
+      "expected": "definition"
     }
   ],
   "latest_result": {
-    "run_id": "day3-full-2026-08-28T01:08:33+08:00",
-    "scope": "30-question Golden evaluation",
-    "commit": "b69575706daee54d1f5de0008fa3cb4bb9706f06",
+    "run_id": "day4-business-2026-08-29T00:07:43+08:00",
+    "scope": "45-question portfolio Golden evaluation",
+    "commit": "3de024389fae24d0fca18503903ff648a7fb9ba7",
     "environment": {
       "python": "3.14.5",
       "database": "SQLite deterministic fixture",
-      "semantic_adapter": "local_certified_metric",
+      "semantic_adapter": "local_semantic_catalog",
       "retrieval": "keyword_plus_feature_hash"
     },
     "summary": {
-      "total": 30,
-      "passed": 30,
+      "total": 45,
+      "passed": 45,
       "failed": 0,
       "accuracy": 100.0,
-      "clarification_rate": 10.0,
+      "clarification_rate": 6.67,
       "clarification_success_rate": 100.0,
       "safety_rejection_rate": 100.0,
       "retrieval_hit_at_5": 100.0,
-      "mrr": 1.0,
-      "latency_p50_ms": 4.79,
-      "latency_p95_ms": 7.01,
+      "mrr": 0.9829,
+      "latency_p50_ms": 5.71,
+      "latency_p95_ms": 7.59,
       "failure_distribution": {}
     },
     "cases": [
@@ -388,7 +587,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 14.52,
+        "latency_ms": 18.05,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -398,7 +597,7 @@
           "verified.gmv_30d",
           "term.recent_30d",
           "verified.gmv_region",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -417,7 +616,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.06,
+        "latency_ms": 5.77,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -427,7 +626,7 @@
           "verified.gmv_30d",
           "term.recent_30d",
           "verified.gmv_region",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -446,7 +645,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 6.3,
+        "latency_ms": 5.68,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -456,7 +655,7 @@
           "verified.gmv_30d",
           "verified.gmv_region",
           "term.recent_30d",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -475,7 +674,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.83,
+        "latency_ms": 6.5,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -485,7 +684,7 @@
           "verified.gmv_region",
           "verified.gmv_30d",
           "metric.aov",
-          "term.recent_30d"
+          "metric.discount_rate"
         ],
         "checks": {
           "intent": true,
@@ -504,7 +703,7 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.35,
+        "latency_ms": 6.13,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -514,7 +713,7 @@
           "verified.gmv_region",
           "verified.gmv_30d",
           "term.recent_30d",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -533,7 +732,7 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 4.93,
+        "latency_ms": 6.01,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -543,7 +742,7 @@
           "verified.gmv_30d",
           "verified.gmv_region",
           "term.recent_30d",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -562,7 +761,7 @@
         "expected": "time_series",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.85,
+        "latency_ms": 6.27,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -571,8 +770,8 @@
           "metric.gmv",
           "verified.gmv_region",
           "verified.gmv_30d",
-          "term.recent_30d",
-          "metric.aov"
+          "metric.refund_rate",
+          "schema.campaign_daily"
         ],
         "checks": {
           "intent": true,
@@ -591,7 +790,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.05,
+        "latency_ms": 5.71,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -600,8 +799,8 @@
           "metric.net_revenue",
           "verified.gmv_30d",
           "term.recent_30d",
-          "verified.gmv_region",
-          "metric.order_count"
+          "verified.campaign_roas",
+          "verified.gmv_region"
         ],
         "checks": {
           "intent": true,
@@ -620,7 +819,7 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 4.83,
+        "latency_ms": 8.55,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -628,9 +827,9 @@
         "evidence_ids": [
           "metric.net_revenue",
           "verified.gmv_region",
-          "metric.gmv",
-          "schema.customers",
-          "metric.aov"
+          "metric.attributed_revenue",
+          "metric.roas",
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -649,7 +848,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 4.36,
+        "latency_ms": 6.04,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -678,17 +877,17 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.28,
+        "latency_ms": 5.69,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
         "reciprocal_rank": 1.0,
         "evidence_ids": [
           "metric.order_count",
+          "metric.quantity",
           "term.valid_order",
           "metric.aov",
-          "metric.net_revenue",
-          "verified.gmv_30d"
+          "metric.customer_count"
         ],
         "checks": {
           "intent": true,
@@ -707,7 +906,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 7.07,
+        "latency_ms": 5.8,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -717,7 +916,7 @@
           "verified.gmv_30d",
           "term.recent_30d",
           "verified.gmv_region",
-          "metric.order_count"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -736,7 +935,7 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.09,
+        "latency_ms": 5.94,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -744,9 +943,9 @@
         "evidence_ids": [
           "metric.aov",
           "verified.gmv_region",
+          "metric.quantity",
           "metric.gmv",
-          "schema.customers",
-          "verified.gmv_30d"
+          "schema.customers"
         ],
         "checks": {
           "intent": true,
@@ -765,7 +964,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 4.57,
+        "latency_ms": 5.68,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -775,7 +974,7 @@
           "verified.gmv_30d",
           "term.recent_30d",
           "verified.gmv_region",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -794,7 +993,7 @@
         "expected": "scalar_positive",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 6.15,
+        "latency_ms": 5.61,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -803,8 +1002,8 @@
           "metric.gmv",
           "verified.gmv_region",
           "verified.gmv_30d",
-          "metric.aov",
-          "term.recent_30d"
+          "metric.marketing_spend",
+          "metric.aov"
         ],
         "checks": {
           "intent": true,
@@ -823,7 +1022,7 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 7.01,
+        "latency_ms": 6.83,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -833,7 +1032,7 @@
           "verified.gmv_30d",
           "term.recent_30d",
           "verified.gmv_region",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -852,7 +1051,7 @@
         "expected": "definition",
         "actual": "success",
         "intent": "knowledge_query",
-        "latency_ms": 2.61,
+        "latency_ms": 3.36,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -861,8 +1060,8 @@
           "metric.gmv",
           "verified.gmv_30d",
           "verified.gmv_region",
-          "metric.aov",
-          "metric.order_count"
+          "metric.refund_rate",
+          "metric.aov"
         ],
         "checks": {
           "intent": true,
@@ -881,17 +1080,17 @@
         "expected": "definition",
         "actual": "success",
         "intent": "knowledge_query",
-        "latency_ms": 2.36,
+        "latency_ms": 3.49,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
         "reciprocal_rank": 1.0,
         "evidence_ids": [
           "metric.net_revenue",
-          "metric.gmv",
-          "metric.aov",
-          "metric.order_count",
-          "verified.gmv_30d"
+          "metric.refund_rate",
+          "metric.attributed_revenue",
+          "metric.refund_amount",
+          "metric.roas"
         ],
         "checks": {
           "intent": true,
@@ -910,7 +1109,7 @@
         "expected": "definition",
         "actual": "success",
         "intent": "knowledge_query",
-        "latency_ms": 2.34,
+        "latency_ms": 3.52,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -919,8 +1118,8 @@
           "term.valid_order",
           "metric.order_count",
           "metric.net_revenue",
-          "metric.aov",
-          "schema.orders"
+          "metric.refund_amount",
+          "metric.aov"
         ],
         "checks": {
           "intent": true,
@@ -939,17 +1138,17 @@
         "expected": "definition",
         "actual": "success",
         "intent": "knowledge_query",
-        "latency_ms": 2.35,
+        "latency_ms": 3.48,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
         "reciprocal_rank": 1.0,
         "evidence_ids": [
           "schema.orders",
-          "metric.gmv",
-          "metric.order_count",
-          "term.valid_order",
-          "metric.aov"
+          "schema.campaign_daily",
+          "schema.inventory_snapshots",
+          "metric.quantity",
+          "metric.gmv"
         ],
         "checks": {
           "intent": true,
@@ -968,7 +1167,7 @@
         "expected": "clarification",
         "actual": "error",
         "category": "ambiguous_question",
-        "latency_ms": 0.62,
+        "latency_ms": 0.76,
         "trace_nodes": 3,
         "checks": {
           "expected_failure_category": true
@@ -981,7 +1180,7 @@
         "expected": "clarification",
         "actual": "error",
         "category": "ambiguous_question",
-        "latency_ms": 0.56,
+        "latency_ms": 0.69,
         "trace_nodes": 3,
         "checks": {
           "expected_failure_category": true
@@ -994,7 +1193,7 @@
         "expected": "clarification",
         "actual": "error",
         "category": "ambiguous_question",
-        "latency_ms": 0.55,
+        "latency_ms": 0.92,
         "trace_nodes": 3,
         "checks": {
           "expected_failure_category": true
@@ -1007,7 +1206,7 @@
         "expected": "rejected",
         "actual": "error",
         "category": "unsafe_request",
-        "latency_ms": 0.6,
+        "latency_ms": 0.72,
         "trace_nodes": 3,
         "checks": {
           "expected_failure_category": true
@@ -1020,7 +1219,7 @@
         "expected": "rejected",
         "actual": "error",
         "category": "unsafe_request",
-        "latency_ms": 0.6,
+        "latency_ms": 0.72,
         "trace_nodes": 3,
         "checks": {
           "expected_failure_category": true
@@ -1033,7 +1232,7 @@
         "expected": "rejected",
         "actual": "error",
         "category": "off_domain",
-        "latency_ms": 0.57,
+        "latency_ms": 0.69,
         "trace_nodes": 3,
         "checks": {
           "expected_failure_category": true
@@ -1046,7 +1245,7 @@
         "expected": "scalar",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 4.76,
+        "latency_ms": 5.8,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -1056,7 +1255,7 @@
           "verified.gmv_region",
           "verified.gmv_30d",
           "metric.aov",
-          "term.recent_30d"
+          "metric.discount_rate"
         ],
         "checks": {
           "intent": true,
@@ -1075,7 +1274,7 @@
         "expected": "comparison",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 5.13,
+        "latency_ms": 6.41,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
@@ -1085,7 +1284,7 @@
           "verified.gmv_30d",
           "term.recent_30d",
           "verified.gmv_region",
-          "metric.aov"
+          "verified.campaign_roas"
         ],
         "checks": {
           "intent": true,
@@ -1104,17 +1303,17 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 4.49,
+        "latency_ms": 5.37,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
         "reciprocal_rank": 1.0,
         "evidence_ids": [
-          "schema.orders",
+          "metric.refund_amount",
           "metric.net_revenue",
+          "metric.refund_rate",
           "verified.gmv_region",
-          "metric.gmv",
-          "schema.customers"
+          "metric.gmv"
         ],
         "checks": {
           "intent": true,
@@ -1133,17 +1332,452 @@
         "expected": "table_nonempty",
         "actual": "success",
         "intent": "metric_query",
-        "latency_ms": 4.7,
+        "latency_ms": 5.62,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 3,
+        "reciprocal_rank": 0.3333,
+        "evidence_ids": [
+          "metric.quantity",
+          "verified.inventory_stockout",
+          "schema.products",
+          "schema.inventory_snapshots",
+          "metric.discount_rate"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G031",
+        "question": "最近 30 天退款率是多少？",
+        "passed": true,
+        "expected": "scalar_positive",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.57,
         "trace_nodes": 12,
         "repair_count": 0,
         "retrieval_rank": 1,
         "reciprocal_rank": 1.0,
         "evidence_ids": [
-          "schema.products",
+          "metric.refund_rate",
+          "verified.gmv_30d",
+          "metric.net_revenue",
+          "term.recent_30d",
+          "verified.gmv_region"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G032",
+        "question": "最近 30 天各渠道退款率",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.94,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.refund_rate",
+          "metric.net_revenue",
+          "term.recent_30d",
+          "verified.gmv_30d",
+          "verified.gmv_region"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G033",
+        "question": "本月优惠率是多少？",
+        "passed": true,
+        "expected": "scalar_positive",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.52,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.discount_rate",
+          "verified.gmv_30d",
+          "metric.stockout_rate",
+          "metric.conversion_rate",
+          "verified.inventory_stockout"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G034",
+        "question": "最近 30 天成交客户数",
+        "passed": true,
+        "expected": "scalar_positive",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.16,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.customer_count",
+          "term.recent_30d",
+          "verified.gmv_30d",
           "verified.gmv_region",
-          "schema.customers",
+          "verified.campaign_roas"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G035",
+        "question": "最近 30 天各品类销量排行",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 6.46,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.quantity",
+          "term.recent_30d",
+          "verified.gmv_30d",
+          "verified.campaign_roas",
+          "verified.gmv_region"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G036",
+        "question": "最近 30 天各活动下单转化率",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 7.6,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.conversion_rate",
+          "verified.campaign_roas",
+          "verified.gmv_30d",
+          "term.recent_30d",
+          "verified.gmv_region"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G037",
+        "question": "最近 30 天按渠道看广告花费",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.56,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.marketing_spend",
+          "verified.campaign_roas",
+          "verified.gmv_30d",
+          "term.recent_30d",
+          "schema.campaign_daily"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G038",
+        "question": "最近 30 天各活动归因收入",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.74,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.attributed_revenue",
+          "verified.campaign_roas",
+          "metric.net_revenue",
+          "schema.campaign_daily",
+          "term.recent_30d"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G039",
+        "question": "最近 30 天各活动 ROAS 排名",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.81,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.roas",
+          "verified.campaign_roas",
+          "verified.gmv_30d",
+          "term.recent_30d",
+          "verified.gmv_region"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G040",
+        "question": "开学季最近 30 天 ROAS",
+        "passed": true,
+        "expected": "scalar_positive",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.41,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.roas",
+          "verified.campaign_roas",
+          "verified.gmv_30d",
+          "term.recent_30d",
+          "verified.gmv_region"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G041",
+        "question": "今天各品类可用库存",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 5.9,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.available_inventory",
+          "verified.inventory_stockout",
+          "schema.inventory_snapshots",
+          "term.recent_30d",
+          "metric.stockout_product_count"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G042",
+        "question": "今天缺货商品数",
+        "passed": true,
+        "expected": "scalar",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 6.4,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.stockout_product_count",
+          "metric.quantity",
+          "metric.stockout_rate",
+          "verified.inventory_stockout",
+          "schema.inventory_snapshots"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G043",
+        "question": "今天各品类缺货率",
+        "passed": true,
+        "expected": "table_nonempty",
+        "actual": "success",
+        "intent": "metric_query",
+        "latency_ms": 7.59,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.stockout_rate",
+          "verified.inventory_stockout",
+          "metric.stockout_product_count",
+          "schema.inventory_snapshots",
+          "metric.quantity"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G044",
+        "question": "ROAS 的定义是什么？",
+        "passed": true,
+        "expected": "definition",
+        "actual": "success",
+        "intent": "knowledge_query",
+        "latency_ms": 6.3,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.roas",
+          "verified.campaign_roas",
+          "verified.gmv_30d",
+          "verified.inventory_stockout",
+          "metric.available_inventory"
+        ],
+        "checks": {
+          "intent": true,
+          "metric": true,
+          "dimensions": true,
+          "time_range": true,
+          "filters": true,
+          "retrieval_hit_at_5": true,
+          "expected_behavior": true
+        }
+      },
+      {
+        "id": "G045",
+        "question": "下单转化率是什么？",
+        "passed": true,
+        "expected": "definition",
+        "actual": "success",
+        "intent": "knowledge_query",
+        "latency_ms": 3.37,
+        "trace_nodes": 12,
+        "repair_count": 0,
+        "retrieval_rank": 1,
+        "reciprocal_rank": 1.0,
+        "evidence_ids": [
+          "metric.conversion_rate",
           "metric.order_count",
-          "metric.gmv"
+          "term.last_touch_attribution",
+          "metric.discount_rate",
+          "metric.customer_count"
         ],
         "checks": {
           "intent": true,

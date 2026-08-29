@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 import json
 import math
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -30,7 +31,11 @@ class HybridRetriever:
     """Simplified local hybrid retrieval; preserves trace fields used by pgvector target."""
 
     def __init__(self, knowledge_path: Path | None = None):
-        path = knowledge_path or ROOT / "data" / "knowledge.json"
+        if knowledge_path is None:
+            profile = os.getenv("CHATBI_DATA_PROFILE", "demo").strip().lower()
+            filename = "knowledge_olist.json" if profile == "olist" else "knowledge.json"
+            knowledge_path = ROOT / "data" / filename
+        path = knowledge_path
         self.documents: list[dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))
 
     def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:

@@ -1,47 +1,85 @@
 [
   {
-    "id": "metric.gmv",
-    "name": "GMV",
-    "display_name": "成交总额",
-    "description": "统计已支付及已退款订单的下单总金额，取消订单不计入；退款额不从 GMV 扣减。",
-    "formula": "SUM(orders.gross_amount) FILTER (WHERE status IN ('paid','refunded'))",
-    "grain": "order",
-    "dimensions": ["order_date", "region", "channel"],
-    "owner": "经营分析",
-    "certified": true
+    "id":"metric.gmv","name":"gmv","display_name":"GMV","description":"有效订单的成交总额，退款额不从 GMV 扣减。","formula":"SUM(orders.gross_amount)",
+    "aliases":["GMV","成交总额","销售额"],"expression":"ROUND(SUM(orders.gross_amount), 2)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel","category":"products.category","product":"products.product_name"},
+    "dimension_joins":{"category":["JOIN order_items ON order_items.order_id = orders.order_id","JOIN products ON products.product_id = order_items.product_id"],"product":["JOIN order_items ON order_items.order_id = orders.order_id","JOIN products ON products.product_id = order_items.product_id"]},
+    "expression_overrides":{"category":"ROUND(SUM(order_items.item_gross_amount), 2)","product":"ROUND(SUM(order_items.item_gross_amount), 2)"},
+    "filter_columns":{"region":"orders.region","channel":"orders.channel","category":"products.category","product":"products.product_name"},"unit":"currency","owner":"经营分析","certified":true
   },
   {
-    "id": "metric.net_revenue",
-    "name": "net_revenue",
-    "display_name": "净收入",
-    "description": "已支付及已退款订单的成交额减优惠与退款。",
-    "formula": "SUM(gross_amount - discount_amount - refund_amount)",
-    "grain": "order",
-    "dimensions": ["order_date", "region", "channel"],
-    "owner": "财务分析",
-    "certified": true
+    "id":"metric.net_revenue","name":"net_revenue","display_name":"净收入","description":"有效订单成交额减优惠与退款。","formula":"SUM(gross_amount - discount_amount - refund_amount)",
+    "aliases":["净收入","实收收入"],"expression":"ROUND(SUM(orders.gross_amount - orders.discount_amount - orders.refund_amount), 2)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel"},"unit":"currency","owner":"财务分析","certified":true
   },
   {
-    "id": "metric.order_count",
-    "name": "order_count",
-    "display_name": "有效订单数",
-    "description": "状态为已支付或已退款的去重订单数。",
-    "formula": "COUNT(DISTINCT order_id) WHERE status IN ('paid','refunded')",
-    "grain": "order",
-    "dimensions": ["order_date", "region", "channel"],
-    "owner": "经营分析",
-    "certified": true
+    "id":"metric.order_count","name":"order_count","display_name":"有效订单数","description":"已支付或已退款状态的去重订单数。","formula":"COUNT(DISTINCT orders.order_id)",
+    "aliases":["有效订单数","订单数","成交订单"],"expression":"COUNT(DISTINCT orders.order_id)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel"},"unit":"count","owner":"经营分析","certified":true
   },
   {
-    "id": "metric.aov",
-    "name": "AOV",
-    "display_name": "客单价",
-    "description": "GMV 除以有效订单数。",
-    "formula": "GMV / NULLIF(order_count, 0)",
-    "grain": "order",
-    "dimensions": ["order_date", "region", "channel"],
-    "owner": "经营分析",
-    "certified": true
+    "id":"metric.aov","name":"aov","display_name":"客单价","description":"GMV 除以有效订单数。","formula":"GMV / order_count",
+    "aliases":["客单价","AOV"],"expression":"ROUND(SUM(orders.gross_amount) / NULLIF(COUNT(DISTINCT orders.order_id), 0), 2)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel"},"unit":"currency","owner":"经营分析","certified":true
+  },
+  {
+    "id":"metric.refund_amount","name":"refund_amount","display_name":"退款金额","description":"有效订单记录的退款金额合计。","formula":"SUM(orders.refund_amount)",
+    "aliases":["退款金额","退款额"],"expression":"ROUND(SUM(orders.refund_amount), 2)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel"},"unit":"currency","owner":"售后分析","certified":true
+  },
+  {
+    "id":"metric.refund_rate","name":"refund_rate","display_name":"退款率","description":"退款金额占 GMV 的比例，用于监控售后损失。","formula":"refund_amount / GMV * 100%",
+    "aliases":["退款率","退款占比"],"expression":"ROUND(100.0 * SUM(orders.refund_amount) / NULLIF(SUM(orders.gross_amount), 0), 2)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel"},"unit":"percent","owner":"售后分析","certified":true
+  },
+  {
+    "id":"metric.discount_rate","name":"discount_rate","display_name":"优惠率","description":"优惠金额占 GMV 的比例，用于监控促销让利。","formula":"discount_amount / GMV * 100%",
+    "aliases":["优惠率","折扣率","优惠占比"],"expression":"ROUND(100.0 * SUM(orders.discount_amount) / NULLIF(SUM(orders.gross_amount), 0), 2)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel"},"unit":"percent","owner":"营销分析","certified":true
+  },
+  {
+    "id":"metric.quantity","name":"quantity","display_name":"销量","description":"有效订单商品明细中的销售件数。","formula":"SUM(order_items.quantity)",
+    "aliases":["销量","销售件数","商品数量"],"expression":"SUM(order_items.quantity)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":["JOIN order_items ON order_items.order_id = orders.order_id","JOIN products ON products.product_id = order_items.product_id"],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel","category":"products.category","product":"products.product_name"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel","category":"products.category","product":"products.product_name"},"unit":"items","owner":"商品分析","certified":true
+  },
+  {
+    "id":"metric.customer_count","name":"customer_count","display_name":"成交客户数","description":"产生有效订单的去重客户数。","formula":"COUNT(DISTINCT orders.customer_id)",
+    "aliases":["成交客户数","购买客户数","客户数"],"expression":"COUNT(DISTINCT orders.customer_id)","base_table":"orders","date_field":"orders.order_date","time_dimension":"order_date","base_filter":"orders.status IN ('paid', 'refunded')","joins":[],
+    "dimensions":{"order_date":"orders.order_date","region":"orders.region","channel":"orders.channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"orders.region","channel":"orders.channel"},"unit":"people","owner":"用户分析","certified":true
+  },
+  {
+    "id":"metric.marketing_spend","name":"marketing_spend","display_name":"广告花费","description":"营销活动每日投放成本合计。","formula":"SUM(campaign_daily.spend)",
+    "aliases":["广告花费","投放花费","营销费用","投放成本"],"expression":"ROUND(SUM(campaign_daily.spend), 2)","base_table":"campaign_daily","date_field":"campaign_daily.metric_date","time_dimension":"metric_date","base_filter":null,"joins":[],
+    "dimensions":{"metric_date":"campaign_daily.metric_date","channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"unit":"currency","owner":"营销分析","certified":true
+  },
+  {
+    "id":"metric.attributed_revenue","name":"attributed_revenue","display_name":"归因收入","description":"按最后触点规则归因到活动的成交收入。","formula":"SUM(campaign_daily.attributed_revenue)",
+    "aliases":["归因收入","广告收入","投放收入"],"expression":"ROUND(SUM(campaign_daily.attributed_revenue), 2)","base_table":"campaign_daily","date_field":"campaign_daily.metric_date","time_dimension":"metric_date","base_filter":null,"joins":[],
+    "dimensions":{"metric_date":"campaign_daily.metric_date","channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"unit":"currency","owner":"营销分析","certified":true
+  },
+  {
+    "id":"metric.conversion_rate","name":"conversion_rate","display_name":"下单转化率","description":"营销活动归因订单数除以会话数。","formula":"attributed_orders / sessions * 100%",
+    "aliases":["下单转化率","转化率","购买转化率"],"expression":"ROUND(100.0 * SUM(campaign_daily.attributed_orders) / NULLIF(SUM(campaign_daily.sessions), 0), 2)","base_table":"campaign_daily","date_field":"campaign_daily.metric_date","time_dimension":"metric_date","base_filter":null,"joins":[],
+    "dimensions":{"metric_date":"campaign_daily.metric_date","channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"unit":"percent","owner":"增长分析","certified":true
+  },
+  {
+    "id":"metric.roas","name":"roas","display_name":"ROAS","description":"归因收入除以广告花费，用于衡量投放回报。","formula":"attributed_revenue / marketing_spend",
+    "aliases":["ROAS","广告回报","投放回报","投产比"],"expression":"ROUND(SUM(campaign_daily.attributed_revenue) / NULLIF(SUM(campaign_daily.spend), 0), 2)","base_table":"campaign_daily","date_field":"campaign_daily.metric_date","time_dimension":"metric_date","base_filter":null,"joins":[],
+    "dimensions":{"metric_date":"campaign_daily.metric_date","channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"channel":"campaign_daily.channel","campaign":"campaign_daily.campaign_name"},"unit":"ratio","owner":"增长分析","certified":true
+  },
+  {
+    "id":"metric.available_inventory","name":"available_inventory","display_name":"可用库存","description":"库存快照中的可售数量合计。","formula":"SUM(inventory_snapshots.available_qty)",
+    "aliases":["可用库存","库存量","可售库存"],"expression":"SUM(inventory_snapshots.available_qty)","base_table":"inventory_snapshots","date_field":"inventory_snapshots.snapshot_date","time_dimension":"snapshot_date","base_filter":null,"joins":["JOIN products ON products.product_id = inventory_snapshots.product_id"],
+    "dimensions":{"snapshot_date":"inventory_snapshots.snapshot_date","category":"products.category","product":"products.product_name"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"category":"products.category","product":"products.product_name"},"unit":"items","owner":"供应链分析","certified":true
+  },
+  {
+    "id":"metric.stockout_product_count","name":"stockout_product_count","display_name":"缺货商品数","description":"库存快照中可用库存为零的去重商品数。","formula":"COUNT(DISTINCT CASE WHEN available_qty = 0 THEN product_id END)",
+    "aliases":["缺货商品数","缺货数"],"expression":"COUNT(DISTINCT CASE WHEN inventory_snapshots.available_qty = 0 THEN inventory_snapshots.product_id END)","base_table":"inventory_snapshots","date_field":"inventory_snapshots.snapshot_date","time_dimension":"snapshot_date","base_filter":null,"joins":["JOIN products ON products.product_id = inventory_snapshots.product_id"],
+    "dimensions":{"snapshot_date":"inventory_snapshots.snapshot_date","category":"products.category"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"category":"products.category"},"unit":"count","owner":"供应链分析","certified":true
+  },
+  {
+    "id":"metric.stockout_rate","name":"stockout_rate","display_name":"缺货率","description":"缺货商品数占库存快照商品数的比例。","formula":"stockout_products / products * 100%",
+    "aliases":["缺货率","断货率"],"expression":"ROUND(100.0 * COUNT(DISTINCT CASE WHEN inventory_snapshots.available_qty = 0 THEN inventory_snapshots.product_id END) / NULLIF(COUNT(DISTINCT inventory_snapshots.product_id), 0), 2)","base_table":"inventory_snapshots","date_field":"inventory_snapshots.snapshot_date","time_dimension":"snapshot_date","base_filter":null,"joins":["JOIN products ON products.product_id = inventory_snapshots.product_id"],
+    "dimensions":{"snapshot_date":"inventory_snapshots.snapshot_date","category":"products.category"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"category":"products.category"},"unit":"percent","owner":"供应链分析","certified":true
   }
 ]
-

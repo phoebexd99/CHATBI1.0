@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 from time import perf_counter
 
@@ -13,6 +14,7 @@ from .config import settings
 from .db import Database
 from .retrieval import HybridRetriever, ROOT
 from .safety import SQLSafetyGate, UnsafeSQL
+from .semantic import SemanticCatalog
 from .workflow import QueryState, QueryWorkflow, WorkflowFailure
 from .wren import make_wren_adapter
 
@@ -23,7 +25,8 @@ class QueryRequest(BaseModel):
 
 database = Database(settings.database_url)
 retriever = HybridRetriever()
-workflow = QueryWorkflow(database, retriever, make_wren_adapter(settings), SQLSafetyGate())
+catalog = SemanticCatalog()
+workflow = QueryWorkflow(database, retriever, make_wren_adapter(settings, catalog), SQLSafetyGate(), catalog)
 
 app = FastAPI(title="CHATBI API", version="0.1.0")
 app.add_middleware(
@@ -37,6 +40,7 @@ app.add_middleware(
 
 ERROR_MESSAGES = {
     "ambiguous_question": "请补充明确的指标、时间范围或分析维度。",
+    "unsupported_dimension": "该指标暂不支持所要求的分析维度，请更换维度或选择对应数据域的指标。",
     "unsafe_request": "该请求涉及数据修改或敏感信息导出，已被安全策略拒绝。",
     "off_domain": "该问题不属于当前经营分析数据域。",
     "unsafe_sql": "生成的 SQL 未通过安全校验。",
@@ -71,7 +75,7 @@ def health() -> dict:
         db_status = "ok"
     except Exception as error:
         db_status = f"error:{type(error).__name__}"
-    return {"status": "ok" if db_status == "ok" else "degraded", "database": db_status, "semantic_adapter": "wren_http" if settings.wren_base_url else "local_certified_metric"}
+    return {"status": "ok" if db_status == "ok" else "degraded", "database": db_status, "semantic_adapter": "wren_http" if settings.wren_base_url else "local_semantic_catalog", "certified_metrics": len(catalog.metrics)}
 
 
 @app.post("/api/query")
@@ -104,10 +108,15 @@ def knowledge() -> dict:
     return {"items": retriever.documents, "counts": {kind: sum(item["type"] == kind for item in retriever.documents) for kind in ("schema", "metric", "term", "verified_nl_sql")}}
 
 
+@app.get("/api/metrics")
+def metrics() -> dict:
+    return {"total": len(catalog.metrics), "items": [asdict(metric) for metric in catalog.metrics.values()]}
+
+
 @app.get("/api/evals")
 def evaluations() -> dict:
     questions = json.loads((ROOT / "evals" / "golden_questions.json").read_text(encoding="utf-8"))
-    results = sorted((ROOT / "evals" / "results").glob("day3-full-*.json"), reverse=True)
+    results = sorted((ROOT / "evals" / "results").glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
     latest_result = json.loads(results[0].read_text(encoding="utf-8")) if results else None
     return {"total": len(questions), "questions": questions, "latest_result": latest_result}
 

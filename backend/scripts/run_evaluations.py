@@ -16,9 +16,9 @@ from backend.app.wren import LocalCertifiedMetricAdapter
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the CHATBI 30-question Golden evaluation.")
-    parser.add_argument("--output", type=Path, default=ROOT / "evals" / "results" / f"day3-full-{datetime.now().date().isoformat()}.json")
-    parser.add_argument("--database", type=Path, default=ROOT / "evals" / ".day3-evaluation.db")
+    parser = argparse.ArgumentParser(description="Run the CHATBI portfolio Golden evaluation.")
+    parser.add_argument("--output", type=Path, default=ROOT / "evals" / "results" / f"day4-business-{datetime.now().date().isoformat()}.json")
+    parser.add_argument("--database", type=Path, default=ROOT / "evals" / ".portfolio-evaluation.db")
     parser.add_argument("--replay-output", type=Path, default=None, help="Optional GitHub Pages replay fixture path.")
     args = parser.parse_args()
 
@@ -33,12 +33,12 @@ def main() -> None:
     except Exception:
         commit = "unknown"
     artifact = {
-        "run_id": f"day3-full-{datetime.now().astimezone().isoformat(timespec='seconds')}",
-        "scope": "30-question Golden evaluation",
+        "run_id": f"day4-business-{datetime.now().astimezone().isoformat(timespec='seconds')}",
+        "scope": f"{len(cases)}-question portfolio Golden evaluation",
         "commit": commit,
         "environment": {
             "python": platform.python_version(), "database": "SQLite deterministic fixture",
-            "semantic_adapter": "local_certified_metric", "retrieval": "keyword_plus_feature_hash",
+            "semantic_adapter": "local_semantic_catalog", "retrieval": "keyword_plus_feature_hash",
         },
         **evaluation,
     }

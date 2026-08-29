@@ -10,7 +10,12 @@ class UnsafeSQL(ValueError):
 
 
 class SQLSafetyGate:
-    ALLOWED_TABLES = {"orders", "customers", "products", "order_items"}
+    ALLOWED_TABLES = {
+        "orders", "customers", "products", "order_items", "campaign_daily", "inventory_snapshots",
+        "fct_order", "fct_order_item", "fct_marketing_lead", "fct_payment", "fct_review",
+        "fct_inventory_snapshot", "dim_customer", "dim_product", "dim_seller",
+    }
+    ALLOWED_SCHEMAS = {"public", "chatbi_mart"}
     FORBIDDEN_FUNCTIONS = {"pg_read_file", "pg_ls_dir", "dblink", "lo_import", "lo_export"}
 
     def validate(self, sql: str, dialect: str) -> str:
@@ -28,10 +33,16 @@ class SQLSafetyGate:
         forbidden_nodes = (exp.Insert, exp.Update, exp.Delete, exp.Drop, exp.Alter, exp.Create, exp.Command)
         if any(statement.find(node) for node in forbidden_nodes):
             raise UnsafeSQL("DDL, DML, and commands are forbidden")
-        tables = {table.name.lower() for table in statement.find_all(exp.Table)}
+        table_nodes = list(statement.find_all(exp.Table))
+        tables = {table.name.lower() for table in table_nodes}
         unknown = tables - self.ALLOWED_TABLES
         if unknown:
             raise UnsafeSQL(f"Table not allow-listed: {', '.join(sorted(unknown))}")
+        unknown_schemas = {
+            table.db.lower() for table in table_nodes if table.db and table.db.lower() not in self.ALLOWED_SCHEMAS
+        }
+        if unknown_schemas:
+            raise UnsafeSQL(f"Schema not allow-listed: {', '.join(sorted(unknown_schemas))}")
         functions = {function.sql_name().lower() for function in statement.find_all(exp.Func)}
         if functions & self.FORBIDDEN_FUNCTIONS:
             raise UnsafeSQL("Dangerous function is forbidden")

@@ -2,12 +2,23 @@
 
 A four-day, portfolio-grade conversational BI MVP for business operators who need certified metrics without SQL. The current implementation provides a real vertical slice: Next.js UI → FastAPI/SSE → LangGraph workflow → hybrid knowledge retrieval / Wren adapter → SQLGlot safety → PostgreSQL (plus SQLite local fallback).
 
-## Current status (Day 3 baseline)
+The cloud PostgreSQL instance now also contains an isolated Olist warehouse contract and loaded anonymized public data. See [`docs/13-olist-warehouse.md`](docs/13-olist-warehouse.md) for the raw → Mart layers, import command, metric boundary, and inventory limitation. Set `CHATBI_DATA_PROFILE=olist` only after pointing Live mode at that database; the default `demo` profile remains the deterministic local/replay path.
 
-- **Implemented:** real node-level SSE trace, metric and knowledge-answer paths, ambiguity/safety/off-domain failures with trace, comparison insights, searchable knowledge/evaluation centers, a reproducible 30-question evaluation runner, and GitHub Pages replay fixtures.
-- **Measured:** 30/30 Golden cases pass in the deterministic SQLite/local-adapter environment; clarification rate is 10% with 100% expected-clarification coverage, safety rejection is 100%, and retrieval hit@5 is 100%. See `evals/results/day3-full-2026-08-28.json`.
-- **Still simplified:** local deterministic retrieval features, local certified metric planning, deterministic insight/chart selection, and non-production synthetic data.
+## Architecture overview
+
+![CHATBI intelligent-query architecture](docs/assets/chatbi-overall-architecture-v2.png)
+
+The current implementation and its production-evolution boundary are shown together: Live mode traverses the API, workflow, context/semantic, safety, and database layers; GitHub Pages Replay reads static fixtures without a backend or database. A comparison with related open-source systems and public Text-to-SQL datasets is available in [`docs/11-related-projects-and-datasets.md`](docs/11-related-projects-and-datasets.md).
+
+## Current status (business semantic expansion)
+
+- **Implemented:** real node-level SSE trace, metric and knowledge-answer paths, ambiguity/safety/off-domain failures with trace, comparison insights, searchable knowledge/evaluation centers, and GitHub Pages replay fixtures. The local semantic layer is now catalog-driven rather than question-branch-driven.
+- **Business coverage:** 16 certified metrics across transaction health, marketing acquisition, and inventory operations; arbitrary rolling-day windows; composable dimensions and filters; database-discovered low-cardinality values; 45 Golden questions.
+- **Measured:** 45/45 Golden cases pass in the deterministic SQLite/local-adapter environment; clarification success and safety rejection are 100%, retrieval hit@5 is 100%, and MRR is 0.9829. See `evals/results/day4-business-2026-08-29.json`.
+- **Still simplified:** local deterministic retrieval features, governed catalog SQL templates, deterministic insight/chart selection, and non-production synthetic data.
 - **Design-only:** production identity/RLS, pgvector ingestion and release management, production Wren deployment, OpenTelemetry export, and cloud rollout. See `docs/10-production-readiness.md`.
+
+The extension model, supported business questions, and instructions for adding a new metric or domain are documented in [`docs/12-business-semantic-expansion.md`](docs/12-business-semantic-expansion.md). The Olist integration and cloud-side Mart contract are documented in [`docs/13-olist-warehouse.md`](docs/13-olist-warehouse.md).
 
 ## Day 1 status
 
@@ -77,5 +88,5 @@ Architecture and delivery evidence live in [`docs/`](docs/); the Golden set live
 
 ## Security
 
-Only read-only `SELECT` statements over allow-listed schemas/tables pass the SQLGlot gate. Row limits, statement count, forbidden functions, comments, and DDL/DML are checked before dry-run and execution. No secret is stored in the repository. Before any later Tencent Cloud deployment, restrict security-group source ranges—do not leave database/application/admin ports open to all IPv4.
+Only read-only `SELECT` statements over allow-listed analytics tables pass the SQLGlot gate. Row limits, statement count, forbidden functions, comments, and DDL/DML are checked before dry-run and execution. No secret is stored in the repository. Before any later Tencent Cloud deployment, restrict security-group source ranges—do not leave database/application/admin ports open to all IPv4.
 

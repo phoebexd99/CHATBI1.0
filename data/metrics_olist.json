@@ -1,0 +1,37 @@
+[
+  {
+    "id":"metric.olist_gmv","name":"olist_gmv","display_name":"Olist商品成交额","description":"有效订单商品明细 price 之和；不含运费，取消/不可用订单排除。","formula":"SUM(chatbi_mart.fct_order_item.item_gmv)",
+    "aliases":["Olist GMV","Olist成交额","商品成交额","商品销售额"],"expression":"ROUND(SUM(item_gmv), 2)","base_table":"chatbi_mart.fct_order_item","date_field":"order_ts::date","time_dimension":"order_date","base_filter":"order_status NOT IN ('canceled', 'unavailable')","joins":[],
+    "dimensions":{"order_date":"order_ts::date","region":"region","category":"category","product":"product_key","seller":"seller_key"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"region","category":"category","product":"product_key","seller":"seller_key"},"unit":"currency","owner":"chatbi-data","certified":true
+  },
+  {
+    "id":"metric.olist_net_revenue","name":"olist_net_revenue","display_name":"Olist净收入","description":"有效订单的商品成交额；Olist公开数据没有退款流水，不能解释为退款后净额。","formula":"SUM(chatbi_mart.fct_order.net_revenue)",
+    "aliases":["Olist净收入","Olist收入"],"expression":"ROUND(SUM(net_revenue), 2)","base_table":"chatbi_mart.fct_order","date_field":"order_ts::date","time_dimension":"order_date","base_filter":"order_status NOT IN ('canceled', 'unavailable')","joins":[],
+    "dimensions":{"order_date":"order_ts::date","region":"region"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"region"},"unit":"currency","owner":"chatbi-data","certified":true
+  },
+  {
+    "id":"metric.olist_order_count","name":"olist_order_count","display_name":"Olist订单数","description":"fct_order 的订单数，按 order_id 去重。","formula":"COUNT(DISTINCT chatbi_mart.fct_order.order_id)",
+    "aliases":["Olist订单数","Olist有效订单数"],"expression":"COUNT(DISTINCT order_id)","base_table":"chatbi_mart.fct_order","date_field":"order_ts::date","time_dimension":"order_date","base_filter":"order_status NOT IN ('canceled', 'unavailable')","joins":[],
+    "dimensions":{"order_date":"order_ts::date","region":"region"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"region"},"unit":"count","owner":"chatbi-data","certified":true
+  },
+  {
+    "id":"metric.olist_aov","name":"olist_aov","display_name":"Olist客单价","description":"商品成交额除以有效订单数。","formula":"olist_gmv / olist_order_count",
+    "aliases":["Olist客单价","Olist AOV"],"expression":"ROUND(SUM(item_gmv) / NULLIF(COUNT(DISTINCT order_id), 0), 2)","base_table":"chatbi_mart.fct_order_item","date_field":"order_ts::date","time_dimension":"order_date","base_filter":"order_status NOT IN ('canceled', 'unavailable')","joins":[],
+    "dimensions":{"order_date":"order_ts::date","region":"region"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"region"},"unit":"currency","owner":"chatbi-data","certified":true
+  },
+  {
+    "id":"metric.olist_customer_count","name":"olist_customer_count","display_name":"Olist购买客户数","description":"有效订单中的去重匿名客户数。","formula":"COUNT(DISTINCT chatbi_mart.fct_order.customer_key)",
+    "aliases":["Olist购买客户数","Olist客户数"],"expression":"COUNT(DISTINCT customer_key)","base_table":"chatbi_mart.fct_order","date_field":"order_ts::date","time_dimension":"order_date","base_filter":"order_status NOT IN ('canceled', 'unavailable')","joins":[],
+    "dimensions":{"order_date":"order_ts::date","region":"region"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"region":"region"},"unit":"people","owner":"chatbi-data","certified":true
+  },
+  {
+    "id":"metric.olist_marketing_mql","name":"olist_marketing_mql","display_name":"Olist营销线索数","description":"Marketing Funnel 中的 MQL 数，按首次接触日期统计。","formula":"COUNT(DISTINCT chatbi_mart.fct_marketing_lead.mql_id)",
+    "aliases":["Olist MQL","Olist线索数","营销线索数"],"expression":"COUNT(DISTINCT mql_id)","base_table":"chatbi_mart.fct_marketing_lead","date_field":"first_contact_date","time_dimension":"first_contact_date","base_filter":null,"joins":[],
+    "dimensions":{"first_contact_date":"first_contact_date","channel":"channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"channel":"channel"},"unit":"count","owner":"chatbi-growth","certified":true
+  },
+  {
+    "id":"metric.olist_marketing_conversion_rate","name":"olist_marketing_conversion_rate","display_name":"Olist线索转化率","description":"Closed Deal MQL 数除以全部 MQL 数；只适用于 Olist Marketing Funnel 的观察窗口。","formula":"SUM(is_won) / COUNT(DISTINCT mql_id) * 100%",
+    "aliases":["Olist转化率","Olist线索转化率","营销线索转化率"],"expression":"ROUND(100.0 * SUM(is_won) / NULLIF(COUNT(DISTINCT mql_id), 0), 2)","base_table":"chatbi_mart.fct_marketing_lead","date_field":"first_contact_date","time_dimension":"first_contact_date","base_filter":null,"joins":[],
+    "dimensions":{"first_contact_date":"first_contact_date","channel":"channel"},"dimension_joins":{},"expression_overrides":{},"filter_columns":{"channel":"channel"},"unit":"percent","owner":"chatbi-growth","certified":true
+  }
+]

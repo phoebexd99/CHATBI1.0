@@ -21,7 +21,15 @@ type StreamEvent =
   | { type: "result"; result: Result }
   | { type: "error"; error: { category: string; message: string }; trace: TraceItem[] };
 
-const suggestions = ["最近 30 天 GMV 是多少？", "最近 30 天各区域 GMV", "GMV 的定义是什么？", "最近 30 天 GMV 环比如何？"];
+const liveSuggestions = [
+  "最近 30 天 GMV 是多少？",
+  "最近 30 天各渠道退款率",
+  "最近 30 天各活动 ROAS 排名",
+  "开学季最近 30 天下单转化率",
+  "今天各品类可用库存",
+  "ROAS 的定义是什么？",
+];
+const replaySuggestions = ["最近 30 天 GMV 是多少？"];
 const phases = [
   ["interpret", "理解问题"], ["retrieve", "检索知识"], ["plan", "生成语义计划"],
   ["validate", "安全校验 SQL"], ["execute", "执行并生成洞察"],
@@ -40,7 +48,7 @@ function TraceList({ trace, expanded, onExpand }: { trace: TraceItem[]; expanded
 }
 
 export default function QueryWorkspace() {
-  const [question, setQuestion] = useState(suggestions[0]);
+  const [question, setQuestion] = useState(liveSuggestions[0]);
   const [result, setResult] = useState<Result | null>(null);
   const [streamTrace, setStreamTrace] = useState<TraceItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,6 +59,7 @@ export default function QueryWorkspace() {
   const [expandedEvidence, setExpandedEvidence] = useState<string | null>(null);
   const [expandedTrace, setExpandedTrace] = useState<string | null>(null);
   const replay = process.env.NEXT_PUBLIC_DEMO_MODE === "replay";
+  const suggestions = replay ? replaySuggestions : liveSuggestions;
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   const displayTrace = result?.trace ?? streamTrace;
 

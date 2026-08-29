@@ -27,6 +27,21 @@
   {"id":"G026","question":"告诉我明天的股票价格","intent":"off_domain","knowledge_ids":[],"expected":"rejected"},
   {"id":"G027","question":"去年同期 GMV","intent":"metric_query","metric":"gmv","time_range":"last_year_same_period","knowledge_ids":["metric.gmv"],"expected":"scalar"},
   {"id":"G028","question":"最近 30 天 GMV 环比如何？","intent":"metric_query","metric":"gmv","time_range":"last_30_days_vs_previous","knowledge_ids":["metric.gmv"],"expected":"comparison"},
-  {"id":"G029","question":"退款金额最高的区域","intent":"metric_query","metric":"refund_amount","dimensions":["region"],"time_range":"all_time","knowledge_ids":["schema.orders"],"expected":"table_nonempty"},
-  {"id":"G030","question":"各品类销量排行","intent":"metric_query","metric":"quantity","dimensions":["category"],"time_range":"all_time","knowledge_ids":["schema.products"],"expected":"table_nonempty"}
+  {"id":"G029","question":"退款金额最高的区域","intent":"metric_query","metric":"refund_amount","dimensions":["region"],"time_range":"all_time","knowledge_ids":["metric.refund_amount","schema.orders"],"expected":"table_nonempty"},
+  {"id":"G030","question":"各品类销量排行","intent":"metric_query","metric":"quantity","dimensions":["category"],"time_range":"all_time","knowledge_ids":["schema.products"],"expected":"table_nonempty"},
+  {"id":"G031","question":"最近 30 天退款率是多少？","intent":"metric_query","metric":"refund_rate","dimensions":[],"time_range":"last_30_days","knowledge_ids":["metric.refund_rate"],"expected":"scalar_positive"},
+  {"id":"G032","question":"最近 30 天各渠道退款率","intent":"metric_query","metric":"refund_rate","dimensions":["channel"],"time_range":"last_30_days","knowledge_ids":["metric.refund_rate"],"expected":"table_nonempty"},
+  {"id":"G033","question":"本月优惠率是多少？","intent":"metric_query","metric":"discount_rate","dimensions":[],"time_range":"this_month","knowledge_ids":["metric.discount_rate"],"expected":"scalar_positive"},
+  {"id":"G034","question":"最近 30 天成交客户数","intent":"metric_query","metric":"customer_count","dimensions":[],"time_range":"last_30_days","knowledge_ids":["metric.customer_count"],"expected":"scalar_positive"},
+  {"id":"G035","question":"最近 30 天各品类销量排行","intent":"metric_query","metric":"quantity","dimensions":["category"],"time_range":"last_30_days","knowledge_ids":["metric.quantity"],"expected":"table_nonempty"},
+  {"id":"G036","question":"最近 30 天各活动下单转化率","intent":"metric_query","metric":"conversion_rate","dimensions":["campaign"],"time_range":"last_30_days","knowledge_ids":["metric.conversion_rate"],"expected":"table_nonempty"},
+  {"id":"G037","question":"最近 30 天按渠道看广告花费","intent":"metric_query","metric":"marketing_spend","dimensions":["channel"],"time_range":"last_30_days","knowledge_ids":["metric.marketing_spend"],"expected":"table_nonempty"},
+  {"id":"G038","question":"最近 30 天各活动归因收入","intent":"metric_query","metric":"attributed_revenue","dimensions":["campaign"],"time_range":"last_30_days","knowledge_ids":["metric.attributed_revenue"],"expected":"table_nonempty"},
+  {"id":"G039","question":"最近 30 天各活动 ROAS 排名","intent":"metric_query","metric":"roas","dimensions":["campaign"],"time_range":"last_30_days","knowledge_ids":["metric.roas","verified.campaign_roas"],"expected":"table_nonempty"},
+  {"id":"G040","question":"开学季最近 30 天 ROAS","intent":"metric_query","metric":"roas","dimensions":[],"filters":{"campaign":"开学季"},"time_range":"last_30_days","knowledge_ids":["metric.roas"],"expected":"scalar_positive"},
+  {"id":"G041","question":"今天各品类可用库存","intent":"metric_query","metric":"available_inventory","dimensions":["category"],"time_range":"today","knowledge_ids":["metric.available_inventory","schema.inventory_snapshots"],"expected":"table_nonempty"},
+  {"id":"G042","question":"今天缺货商品数","intent":"metric_query","metric":"stockout_product_count","dimensions":[],"time_range":"today","knowledge_ids":["metric.stockout_product_count"],"expected":"scalar"},
+  {"id":"G043","question":"今天各品类缺货率","intent":"metric_query","metric":"stockout_rate","dimensions":["category"],"time_range":"today","knowledge_ids":["metric.stockout_rate","verified.inventory_stockout"],"expected":"table_nonempty"},
+  {"id":"G044","question":"ROAS 的定义是什么？","intent":"knowledge_query","metric":"roas","knowledge_ids":["metric.roas"],"expected":"definition"},
+  {"id":"G045","question":"下单转化率是什么？","intent":"knowledge_query","metric":"conversion_rate","knowledge_ids":["metric.conversion_rate"],"expected":"definition"}
 ]

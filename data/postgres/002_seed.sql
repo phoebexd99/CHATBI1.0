@@ -31,3 +31,32 @@ SELECT 5000 + n, 1000 + n, 1 + (n % 4), 1 + (n % 3), 100 + (n % 9) * 75
 FROM generate_series(1, 120) AS n
 ON CONFLICT DO NOTHING;
 
+INSERT INTO campaign_daily(metric_date, campaign_name, channel, impressions, clicks, sessions, attributed_orders, attributed_revenue, spend)
+SELECT
+  CURRENT_DATE - day,
+  campaign_name,
+  channel,
+  (55 + ((day * 7 + campaign_index * 11) % 90)) * 18,
+  (55 + ((day * 7 + campaign_index * 11) % 90)) * 3,
+  55 + ((day * 7 + campaign_index * 11) % 90),
+  4 + ((day + campaign_index * 2) % 16),
+  (4 + ((day + campaign_index * 2) % 16)) * (160 + campaign_index * 35),
+  180 + campaign_index * 55 + (day % 7) * 8
+FROM generate_series(0, 59) AS day
+CROSS JOIN (VALUES
+  (1, '开学季', '抖音'),
+  (2, '会员复购', '小程序'),
+  (3, '新品首发', '天猫'),
+  (4, '年中大促', '天猫')
+) AS campaigns(campaign_index, campaign_name, channel)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO inventory_snapshots(snapshot_date, product_id, available_qty)
+SELECT
+  CURRENT_DATE - day,
+  product_id,
+  CASE WHEN (day + product_id * 5) % 19 = 0 THEN 0 ELSE 12 + ((day * 3 + product_id * 7) % 75) END
+FROM generate_series(0, 59) AS day
+CROSS JOIN generate_series(1, 4) AS product_id
+ON CONFLICT DO NOTHING;
+
