@@ -44,6 +44,20 @@ class LocalCertifiedMetricAdapter:
                 return [f"{date_field} >= {start}"], period
             start = f"CURRENT_DATE - INTERVAL '{offset} days'" if dialect == "postgres" else f"date('now', '-{offset} days')"
             return [f"{date_field} >= {start}"], None
+        month_match = re.fullmatch(r"month_(\d{4})_(\d{2})", base_range)
+        if month_match and dialect == "postgres":
+            year, month = int(month_match.group(1)), int(month_match.group(2))
+            if 1 <= month <= 12:
+                if month == 12:
+                    next_month = f"{year + 1:04d}-01-01"
+                else:
+                    next_month = f"{year:04d}-{month + 1:02d}-01"
+                start = f"DATE '{year:04d}-{month:02d}-01'"
+                return [f"{date_field} >= {start}", f"{date_field} < DATE '{next_month}'"], None
+        between_match = re.fullmatch(r"between_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})", base_range)
+        if between_match and dialect == "postgres":
+            start, end = between_match.groups()
+            return [f"{date_field} >= DATE '{start}'", f"{date_field} <= DATE '{end}'"], None
         if time_range == "today":
             return [f"{date_field} = CURRENT_DATE" if dialect == "postgres" else f"{date_field} = date('now')"], None
         if time_range == "this_week":

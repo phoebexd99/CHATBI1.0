@@ -45,3 +45,15 @@ def test_safety_rejects_non_chatbi_schema_even_for_known_table():
         assert "Schema not allow-listed" in str(error)
     else:
         raise AssertionError("private schema must not pass the safety gate")
+
+
+def test_olist_catalog_supports_historical_month_queries():
+    catalog = SemanticCatalog(ROOT / "data" / "metrics_olist.json")
+    query = LocalCertifiedMetricAdapter(catalog).plan_sql(
+        "2017年11月Olist商品成交额",
+        SemanticPlan("olist_gmv", [], "month_2017_11", {}),
+        "postgres",
+        [],
+    )
+    assert "DATE '2017-11-01'" in query
+    assert "DATE '2017-12-01'" in query

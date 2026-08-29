@@ -46,6 +46,7 @@ python -m backend.scripts.load_inventory --csv D:\data\inventory\snapshot.csv --
 ## 当前数据边界
 
 - 订单：可认证 `GMV`、订单数、商品数、客单、运费、支付金额、配送时效和评价。
+- 历史查询：支持自然语言中的 `2017年11月` 和 `2017-01-01 到 2017-03-31`，适合 Olist 这类历史数据集。
 - 营销：可认证 MQL、closed deal、渠道转化和 seller LTV 关联；Olist 没有广告 spend，因此不能把 conversion 当作 ROAS。
 - 库存：已建立正式字段契约和导入器，不从订单反推可用库存。要填充它，需要只读 WMS/ERP 快照：`snapshot_date、product_key、available_qty、inventory_source`；当前云端库存行数为 0，等待真实源文件。
 - 治理：`chatbi_meta.metric_registry`、`dataset_registry`、`verified_sql` 支持版本、负责人、审核、下线和血缘登记。

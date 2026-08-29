@@ -169,6 +169,19 @@ class QueryWorkflow:
 
     @staticmethod
     def _extract_time_range(question: str) -> str:
+        month_match = re.search(r"(20\d{2})\s*[-年]\s*(\d{1,2})\s*月?", question)
+        if month_match:
+            year, month = int(month_match.group(1)), int(month_match.group(2))
+            if 1 <= month <= 12:
+                return f"month_{year:04d}_{month:02d}"
+        date_match = re.search(
+            r"(20\d{2}[-/]\d{1,2}[-/]\d{1,2}).{0,8}(?:到|至|至今).{0,8}(20\d{2}[-/]\d{1,2}[-/]\d{1,2})",
+            question,
+        )
+        if date_match:
+            start = date_match.group(1).replace("/", "-")
+            end = date_match.group(2).replace("/", "-")
+            return f"between_{start}_{end}"
         if "去年同期" in question:
             return "last_year_same_period"
         if any(marker in question for marker in ("今天", "今日", "当前")):
