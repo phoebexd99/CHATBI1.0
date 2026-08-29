@@ -1,0 +1,2 @@
+source_id,question,intent,metric,dimensions,time_range,expected,source_role,source_date,notes,review_status
+EXAMPLE-001,请替换为真实业务问题,metric_query,gmv,region,all_time,table_nonempty,运营负责人,2026-08-29,删除这一行后再提交,example
