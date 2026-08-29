@@ -22,6 +22,8 @@ The extension model, supported business questions, and instructions for adding a
 
 For the consolidated project positioning, Olist-based attribution boundary, end-to-end chain, and page-level UI roadmap, see [`docs/17-project-consolidation-and-ui-roadmap.md`](docs/17-project-consolidation-and-ui-roadmap.md). The project can deliver certified order analytics and MQL-to-closed-deal source-funnel attribution without pretending to have real inventory, ad spend, ROAS, or causal lift data.
 
+The business-first UI keeps RAG hits, SQL, and node-level Trace behind an optional verification panel. To run the API-backed Live page locally, see [`docs/18-live-mode-and-api.md`](docs/18-live-mode-and-api.md).
+
 ## Day 1 status
 
 - **Implemented:** synthetic commerce schema and seed data, four knowledge classes, keyword + hashed-vector hybrid retrieval with trace, deterministic graph workflow, replaceable Wren adapter, SQLGlot validation, read-only execution, one repair attempt, query API, replay fixture, three-page UI shell, tests.

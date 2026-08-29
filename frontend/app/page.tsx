@@ -5,9 +5,9 @@ export default function QueryPage() {
   return (
     <section className="page">
       <span className="mode-pill">{mode}</span>
-      <span className="eyebrow">Ask → verify → decide</span>
-      <h1>把经营问题，变成<br />可验证的答案。</h1>
-      <p className="lede">基于认证指标、业务语义和已验证 SQL，给运营人员一个不需要懂 SQL 的可信问数入口。</p>
+      <span className="eyebrow">Ask → understand → decide</span>
+      <h1>先问一个问题，<br />马上看懂经营结果。</h1>
+      <p className="lede">不用写 SQL。用自然语言提问，获得清晰的数字、图表和下一步分析建议；需要复核时，再展开回答依据。</p>
       <QueryWorkspace />
     </section>
   );

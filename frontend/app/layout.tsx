@@ -27,7 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </nav>
           <div className="sidebar-foot">
             <span className="pulse" />
-            <div><strong>Semantic layer online</strong><small>Local certified metrics</small></div>
+            <div><strong>经营分析助手在线</strong><small>公开电商数据 · 可追溯结果</small></div>
           </div>
         </aside>
         <main>{children}</main>
