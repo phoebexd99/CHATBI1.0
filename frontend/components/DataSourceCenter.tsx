@@ -1,14 +1,12 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import QueryWorkspace, { QueryDataset } from "./QueryWorkspace";
 
 type ColumnRole = "time" | "measure" | "dimension" | "identifier";
 type Column = { name: string; sql_name?: string; type: string; role?: ColumnRole; nullable?: boolean; non_null_ratio?: number; unique_count?: number; sample_values?: string[] };
 type DatasetTable = { id: string; sheet_name: string; row_count: number; columns: Column[]; preview: Record<string, unknown>[] };
-type Dataset = {
-  id: string; name: string; source_type: "template" | "excel" | "csv" | "postgresql"; status: string; description: string;
-  row_count: number; table_count: number; created_at?: string | null; suggestions: string[]; tables?: DatasetTable[];
-};
+type Dataset = QueryDataset & { status: string; created_at?: string | null; tables?: DatasetTable[] };
 type PostgresForm = { name: string; host: string; port: string; database: string; username: string; password: string; schema_name: string; sslmode: string };
 
 const replayDemo: Dataset = {
@@ -39,6 +37,7 @@ export default function DataSourceCenter() {
   const [selected, setSelected] = useState<Dataset | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [databaseOpen, setDatabaseOpen] = useState(false);
+  const [queryDataset, setQueryDataset] = useState<Dataset | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [datasetNameDraft, setDatasetNameDraft] = useState("");
@@ -52,10 +51,18 @@ export default function DataSourceCenter() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (replay) return;
+    const requestedDataset = new URLSearchParams(window.location.search).get("dataset");
+    if (replay) {
+      if (requestedDataset === replayDemo.id) setQueryDataset(replayDemo);
+      return;
+    }
     fetch(`${apiBase}/api/datasets`)
       .then(response => response.ok ? response.json() : Promise.reject(new Error(`数据源请求失败 (${response.status})`)))
-      .then((payload: { items: Dataset[] }) => setDatasets(payload.items))
+      .then((payload: { items: Dataset[] }) => {
+        setDatasets(payload.items);
+        const requested = payload.items.find(item => item.id === requestedDataset);
+        if (requested && requested.status !== "reconnect_required") setQueryDataset(requested);
+      })
       .catch(caught => setError(caught instanceof Error ? caught.message : "无法读取数据源"))
       .finally(() => setLoading(false));
   }, [apiBase, replay]);
@@ -151,10 +158,19 @@ export default function DataSourceCenter() {
       setError("该数据库连接的临时凭据已失效，请重新连接 PostgreSQL 后再问数。");
       setPickerOpen(false); setDatabaseOpen(true); return;
     }
-    window.history.replaceState({}, "", `?dataset=${encodeURIComponent(dataset.id)}#ask`);
-    window.dispatchEvent(new CustomEvent("chatbi:dataset-selected", { detail: dataset }));
+    window.history.replaceState({}, "", `?dataset=${encodeURIComponent(dataset.id)}`);
     setSelected(null); setPickerOpen(false);
-    document.getElementById("ask")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setQueryDataset(dataset);
+  }
+
+  function closeQuery() {
+    setQueryDataset(null);
+    window.history.replaceState({}, "", window.location.pathname);
+  }
+
+  function changeQueryDataset() {
+    closeQuery();
+    setPickerOpen(true);
   }
 
   return <>
@@ -208,6 +224,11 @@ export default function DataSourceCenter() {
       <div className="role-guide"><span><i className="role-time" />时间：用于年月筛选和趋势</span><span><i className="role-measure" />指标：用于求和、平均和比较</span><span><i className="role-dimension" />维度：用于分类和筛选</span><span><i className="role-identifier" />标识：仅定位记录，不参与求和</span></div>
       {selected.tables?.map(table => <section className="table-profile" key={table.id}><div><strong>{table.sheet_name}</strong><small>{table.row_count.toLocaleString()} 行 · {table.columns.length} 个字段</small></div><div className="column-model-grid">{table.columns.map(column => { const key = `${table.id}:${column.sql_name}`; const role = roleDrafts[key] ?? inferredRole(column); return <label key={column.name}><span><b>{column.name}</b><small>{column.type} · 完整率 {Math.round((column.non_null_ratio ?? 1) * 100)}%</small></span>{selected.source_type === "template" || !column.sql_name ? <em>{roleLabels[role]}</em> : <select aria-label={`${column.name}字段用途`} value={role} onChange={event => setRoleDrafts(current => ({ ...current, [key]: event.target.value as ColumnRole }))}><option value="time">时间</option><option value="measure">指标</option><option value="dimension">维度</option><option value="identifier">标识</option></select>}</label>; })}</div>{table.preview.length > 0 && <div className="preview-table"><table><thead><tr>{Object.keys(table.preview[0]).map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{table.preview.slice(0, 5).map((row, index) => <tr key={index}>{Object.values(row).map((value, valueIndex) => <td key={valueIndex}>{String(value ?? "—")}</td>)}</tr>)}</tbody></table></div>}</section>)}
       <div className="model-actions">{selected.source_type !== "template" && <button className="technical-toggle" onClick={saveModel} disabled={savingModel}>{savingModel ? "保存中…" : "保存字段设置"}</button>}<button className="modal-primary" onClick={() => startAsking(selected)}>使用这份数据开始问数 →</button></div>
+    </article></div>}
+
+    {queryDataset && <div className="modal-backdrop query-backdrop" onClick={closeQuery}><article className="detail-modal query-workspace-modal" onClick={event => event.stopPropagation()}>
+      <div className="query-modal-heading"><div><span className="eyebrow">Ask your data</span><h2>对“{queryDataset.name}”直接提问</h2><p>输入业务问题，平台会在当前窗口持续返回进度、数据结果、图表和简单解读。</p></div><button className="close-button" onClick={closeQuery} aria-label="关闭问数窗口">×</button></div>
+      <QueryWorkspace initialDataset={queryDataset} onChangeData={changeQueryDataset} />
     </article></div>}
   </>;
 }

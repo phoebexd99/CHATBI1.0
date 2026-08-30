@@ -20,7 +20,7 @@ type StreamEvent =
   | { type: "trace"; trace: TraceItem; node: string }
   | { type: "result"; result: Result }
   | { type: "error"; error: { category: string; message: string }; trace: TraceItem[] };
-type Dataset = {
+export type QueryDataset = {
   id: string; name: string; source_type: "template" | "excel" | "csv" | "postgresql"; status?: string; description: string;
   row_count: number; table_count: number; suggestions: string[];
 };
@@ -49,8 +49,8 @@ function TraceList({ trace, expanded, onExpand }: { trace: TraceItem[]; expanded
   return <div className="trace-list">{trace.map((item, index) => <button className={`trace-item trace-${item.status}`} key={`${item.node}-${index}`} onClick={() => onExpand(item.node)}><span className="trace-index">{item.status === "error" ? "!" : item.status === "skipped" ? "–" : index + 1}</span><span className="trace-node"><strong>{item.node}</strong>{expanded === item.node && <small>{item.detail ?? (item.status === "ok" ? "节点完成，结果已写入共享状态" : `节点状态：${item.status}`)}</small>}</span><span className="trace-ms">{item.status} · {item.duration_ms} ms</span></button>)}</div>;
 }
 
-export default function QueryWorkspace() {
-  const [question, setQuestion] = useState(liveSuggestions[0]);
+export default function QueryWorkspace({ initialDataset, onChangeData }: { initialDataset: QueryDataset; onChangeData: () => void }) {
+  const [question, setQuestion] = useState(initialDataset.suggestions?.[0] ?? liveSuggestions[0]);
   const [result, setResult] = useState<Result | null>(null);
   const [streamTrace, setStreamTrace] = useState<TraceItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,12 +62,12 @@ export default function QueryWorkspace() {
   const [expandedEvidence, setExpandedEvidence] = useState<string | null>(null);
   const [expandedTrace, setExpandedTrace] = useState<string | null>(null);
   const replay = process.env.NEXT_PUBLIC_DEMO_MODE === "replay";
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [datasetId, setDatasetId] = useState("demo");
+  const [datasets, setDatasets] = useState<QueryDataset[]>([initialDataset]);
+  const [datasetId, setDatasetId] = useState(initialDataset.id);
   const [datasetLoading, setDatasetLoading] = useState(!replay);
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const selectedDataset = datasets.find(item => item.id === datasetId);
+  const selectedDataset = datasets.find(item => item.id === datasetId) ?? initialDataset;
   const suggestions = replay ? replaySuggestions : selectedDataset?.suggestions?.length ? selectedDataset.suggestions : liveSuggestions;
   const displayTrace = result?.trace ?? streamTrace;
   const visibleHighlights = (result?.insight?.highlights ?? []).filter(item => !/(SQL|dry[- ]run|安全门|allow[- ]list|RAG|Trace|节点)/i.test(item));
@@ -75,17 +75,19 @@ export default function QueryWorkspace() {
   const completedPhases = useMemo<Set<number>>(() => new Set<number>(displayTrace.filter(item => item.status !== "error").map(item => phaseForTrace(item.node))), [displayTrace]);
 
   useEffect(() => {
-    const requestedDataset = new URLSearchParams(window.location.search).get("dataset");
+    const requestedDataset = new URLSearchParams(window.location.search).get("dataset") ?? initialDataset.id;
     if (replay) {
-      setDatasets([{ id: "demo", name: "电商经营演示模板", source_type: "template", description: "内置公开电商演示数据，可直接体验完整问数链路。", row_count: 120, table_count: 6, suggestions: replaySuggestions }]);
+      setDatasets([initialDataset]);
+      setDatasetId(initialDataset.id);
       setDatasetLoading(false);
       return;
     }
     fetch(`${apiBase}/api/datasets`)
       .then(response => response.ok ? response.json() : Promise.reject(new Error(`数据集请求失败 (${response.status})`)))
-      .then((payload: { items: Dataset[] }) => {
-        setDatasets(payload.items);
-        const requested = payload.items.find(item => item.id === requestedDataset);
+      .then((payload: { items: QueryDataset[] }) => {
+        const items = payload.items.some(item => item.id === initialDataset.id) ? payload.items : [initialDataset, ...payload.items];
+        setDatasets(items);
+        const requested = items.find(item => item.id === requestedDataset) ?? initialDataset;
         if (requested) {
           setDatasetId(requested.id);
           if (requested.suggestions?.[0]) setQuestion(requested.suggestions[0]);
@@ -93,11 +95,11 @@ export default function QueryWorkspace() {
       })
       .catch(() => setError("暂时无法读取数据源列表，请确认 Live API 已启动。"))
       .finally(() => setDatasetLoading(false));
-  }, [apiBase, replay]);
+  }, [apiBase, initialDataset, replay]);
 
   useEffect(() => {
     function selectUploadedDataset(event: Event) {
-      const next = (event as CustomEvent<Dataset>).detail;
+      const next = (event as CustomEvent<QueryDataset>).detail;
       if (!next?.id) return;
       setDatasets(current => [next, ...current.filter(item => item.id !== next.id)]);
       setDatasetId(next.id);
@@ -180,7 +182,7 @@ export default function QueryWorkspace() {
       <div className="dataset-context">
         <label><span>当前数据</span><select aria-label="当前数据集" value={datasetId} onChange={event => changeDataset(event.target.value)} disabled={datasetLoading || loading}>{datasetLoading && <option>正在读取数据源…</option>}{datasets.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
         <div><strong>{selectedDataset?.name ?? (datasetLoading ? "正在读取可用数据…" : "电商经营演示模板")}</strong><small>{selectedDataset?.description ?? "选择数据后，系统会根据字段自动推荐可问的问题。"}</small></div>
-        <a href="#data-source">{replay ? "查看数据说明" : "更换或接入数据"} ↑</a>
+        <button type="button" className="dataset-change-link" onClick={onChangeData}>{replay ? "返回数据选择" : "更换或接入数据"} ↑</button>
       </div>
       <div className="ask-row"><span className="ask-icon" aria-hidden="true">⌕</span><input aria-label="经营问题" value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => event.key === "Enter" && ask()} placeholder="例如：最近 30 天各区域 GMV" /><button className="ask-submit" onClick={() => ask()} disabled={loading}>{loading ? "分析中…" : "开始分析"}<span aria-hidden="true">↗</span></button></div>
       <div className="suggestions"><span>试试这样问</span>{suggestions.map(item => <button key={item} onClick={() => ask(item)} disabled={loading}>{item}</button>)}</div>

@@ -26,7 +26,7 @@ The business-first UI keeps RAG hits, SQL, and node-level Trace behind an option
 
 ## File and database data-source MVP
 
-Live mode now uses one unified **智能问数** home page with three explicit entry points: upload an `.xlsx` / `.csv`, connect a read-only PostgreSQL database, or open a guided picker for the commerce demo and previously connected data. Dataset choices are kept inside the picker instead of appearing as an unexplained list on the home page. After selecting a source, the user can inspect its fields and ask a natural-language question without leaving the page. CHATBI generates dataset-specific starter questions and supports controlled totals, averages, counts, grouped comparisons, rankings and date trends. The existing commerce model remains the built-in certified demo template.
+Live mode now uses one unified **智能问数** home page with three explicit entry points: upload an `.xlsx` / `.csv`, connect a read-only PostgreSQL database, or open a guided picker for the commerce demo and previously connected data. Dataset choices are kept inside the picker instead of appearing as an unexplained list on the home page. After selecting a source, the user enters a focused modal workspace that contains the question box, progress, results, charts and optional verification details. CHATBI generates dataset-specific starter questions and supports controlled totals, averages, counts, grouped comparisons, rankings and date trends. The existing commerce model remains the built-in certified demo template.
 
 The upload profile now assigns each field a business role—time, measure, dimension, or identifier—and lets the user confirm or correct it before querying. Uploaded-data questions can apply detected category values and explicit year/month ranges, so prompts such as “2026 年 8 月华东销售额合计” generate scoped, read-only SQL instead of silently analyzing all rows.
 
@@ -69,7 +69,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. The home page contains the complete connect → ask → result flow. The default question is “最近 30 天 GMV 是多少？”, and a small downloadable CSV is included for trying the upload flow. The old `/data-sources` URL remains as a compatibility alias for existing bookmarks.
+Open <http://localhost:3000>. The home page presents the data-entry choices; selecting a dataset opens the focused ask → result workspace as a modal. The default demo question is “最近 30 天 GMV 是多少？”, and a small downloadable CSV is included for trying the upload flow. The old `/data-sources` URL remains as a compatibility alias for existing bookmarks.
 
 ## Run with Docker Compose
 

@@ -1,5 +1,4 @@
 import DataSourceCenter from "@/components/DataSourceCenter";
-import QueryWorkspace from "@/components/QueryWorkspace";
 
 export default function UnifiedQueryPage() {
   const replay = process.env.NEXT_PUBLIC_DEMO_MODE === "replay";
@@ -9,7 +8,7 @@ export default function UnifiedQueryPage() {
       <span className="eyebrow">Connect data → ask → get answers</span>
       <h1>上传你的数据，<br />用一句话得到分析结果。</h1>
       <p className="lede">不需要先懂数据库或 SQL。上传 Excel / CSV，或直接使用电商演示模板；选择数据后自然语言提问，平台会返回数字、图表、明细和简单解读。</p>
-      <div className="hero-actions"><a href="#data-source">接入我的数据 ↓</a><a href="#ask" className="secondary">先用演示模板体验</a></div>
+      <div className="hero-actions"><a href="#data-source">接入我的数据 ↓</a><a href="#data-source" className="secondary">选择演示模板 ↓</a></div>
 
       <div className="core-flow" aria-label="平台核心流程">
         <div><span>1</span><strong>接入数据</strong><small>上传 Excel / CSV，或选择模板</small></div>
@@ -22,10 +21,6 @@ export default function UnifiedQueryPage() {
         <DataSourceCenter />
       </section>
 
-      <section className="flow-section ask-section" id="ask">
-        <div className="flow-section-head"><span>第二步</span><div><h2>对选中的数据直接提问</h2><p>平台会根据字段推荐可问的问题，也可以输入自己的业务问题。</p></div></div>
-        <QueryWorkspace />
-      </section>
     </section>
   );
 }
