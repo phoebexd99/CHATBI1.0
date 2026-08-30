@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import MetricChart from "./MetricChart";
 
@@ -96,6 +95,23 @@ export default function QueryWorkspace() {
       .finally(() => setDatasetLoading(false));
   }, [apiBase, replay]);
 
+  useEffect(() => {
+    function selectUploadedDataset(event: Event) {
+      const next = (event as CustomEvent<Dataset>).detail;
+      if (!next?.id) return;
+      setDatasets(current => [next, ...current.filter(item => item.id !== next.id)]);
+      setDatasetId(next.id);
+      if (next.suggestions?.[0]) setQuestion(next.suggestions[0]);
+      setResult(null); setStreamTrace([]); setStatus("idle"); setError(""); setErrorCategory("");
+    }
+    window.addEventListener("chatbi:dataset-created", selectUploadedDataset);
+    window.addEventListener("chatbi:dataset-selected", selectUploadedDataset);
+    return () => {
+      window.removeEventListener("chatbi:dataset-created", selectUploadedDataset);
+      window.removeEventListener("chatbi:dataset-selected", selectUploadedDataset);
+    };
+  }, []);
+
   function changeDataset(nextId: string) {
     setDatasetId(nextId);
     const next = datasets.find(item => item.id === nextId);
@@ -164,7 +180,7 @@ export default function QueryWorkspace() {
       <div className="dataset-context">
         <label><span>当前数据</span><select aria-label="当前数据集" value={datasetId} onChange={event => changeDataset(event.target.value)} disabled={datasetLoading || loading}>{datasetLoading && <option>正在读取数据源…</option>}{datasets.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
         <div><strong>{selectedDataset?.name ?? (datasetLoading ? "正在读取可用数据…" : "电商经营演示模板")}</strong><small>{selectedDataset?.description ?? "选择数据后，系统会根据字段自动推荐可问的问题。"}</small></div>
-        <Link href="/data-sources">{replay ? "查看数据说明" : "接入新数据"} →</Link>
+        <a href="#data-source">{replay ? "查看数据说明" : "更换或接入数据"} ↑</a>
       </div>
       <div className="ask-row"><span className="ask-icon" aria-hidden="true">⌕</span><input aria-label="经营问题" value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => event.key === "Enter" && ask()} placeholder="例如：最近 30 天各区域 GMV" /><button className="ask-submit" onClick={() => ask()} disabled={loading}>{loading ? "分析中…" : "开始分析"}<span aria-hidden="true">↗</span></button></div>
       <div className="suggestions"><span>试试这样问</span>{suggestions.map(item => <button key={item} onClick={() => ask(item)} disabled={loading}>{item}</button>)}</div>

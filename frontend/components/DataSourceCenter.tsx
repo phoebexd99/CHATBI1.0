@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 
 type Column = { name: string; type: string; nullable?: boolean; unique_count?: number; sample_values?: string[] };
@@ -61,6 +60,7 @@ export default function DataSourceCenter() {
       const created = payload as Dataset;
       setDatasets(current => [current[0] ?? replayDemo, created, ...current.slice(1).filter(item => item.id !== created.id)]);
       setSelected(created); setMessage(`“${created.name}”已完成字段识别，可以开始问数。`);
+      window.dispatchEvent(new CustomEvent("chatbi:dataset-created", { detail: created }));
       setFile(null); setName(""); if (inputRef.current) inputRef.current.value = "";
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "上传失败");
@@ -77,13 +77,14 @@ export default function DataSourceCenter() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "无法读取数据画像"); }
   }
 
-  return <>
-    <section className="source-steps" aria-label="数据接入步骤">
-      <div><span>01</span><strong>上传文件</strong><small>Excel / CSV</small></div>
-      <div><span>02</span><strong>自动识别</strong><small>工作表、字段、类型与样例</small></div>
-      <div><span>03</span><strong>自然语言问数</strong><small>聚合、分组、排名与趋势</small></div>
-    </section>
+  function startAsking(dataset: Dataset) {
+    window.history.replaceState({}, "", `?dataset=${encodeURIComponent(dataset.id)}#ask`);
+    window.dispatchEvent(new CustomEvent("chatbi:dataset-selected", { detail: dataset }));
+    setSelected(null);
+    document.getElementById("ask")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
+  return <>
     <section className="source-layout">
       <form className={`upload-card ${replay ? "disabled" : ""}`} onSubmit={upload}>
         <div className="card-kicker"><h2>接入我的数据</h2><span className="count-badge">本地数据沙箱</span></div>
@@ -100,9 +101,9 @@ export default function DataSourceCenter() {
       </form>
 
       <article className="source-boundary">
-        <span className="eyebrow">开始前</span><h2>什么样的数据更容易问？</h2>
+        <span className="eyebrow">上传提示</span><h2>让系统更准确理解你的数据</h2>
         <ul><li>第一行是清晰且唯一的字段名</li><li>日期、金额、数量保持同一列格式一致</li><li>一个工作表表达一类业务明细</li></ul>
-        <p>这一步先解决“把自己的数据交给 CHATBI 并直接分析”。跨表关联、指标治理、权限隔离和生产数据库连接会在后续数据源层继续扩展。</p>
+        <p>上传后先检查系统识别的字段和样例，再使用自动生成的问题开始分析。原始文件不会进入 Git 仓库。</p>
       </article>
     </section>
 
@@ -116,14 +117,14 @@ export default function DataSourceCenter() {
         <h3>{dataset.name}</h3><p>{dataset.description}</p>
         <div className="dataset-stats"><span><strong>{dataset.table_count}</strong> 张表</span><span><strong>{dataset.row_count.toLocaleString()}</strong> 行</span></div>
         <div className="dataset-questions"><small>可以这样问</small>{dataset.suggestions.slice(0, 3).map(item => <span key={item}>“{item}”</span>)}</div>
-        <div className="dataset-actions"><button className="technical-toggle" onClick={() => inspect(dataset)}>查看数据画像</button><Link href={`/?dataset=${dataset.id}`}>开始问数 →</Link></div>
+        <div className="dataset-actions"><button className="technical-toggle" onClick={() => inspect(dataset)}>查看数据画像</button><button className="dataset-start" onClick={() => startAsking(dataset)}>选择并提问 →</button></div>
       </article>)}
     </section>
 
     {selected && <div className="modal-backdrop" onClick={() => setSelected(null)}><article className="detail-modal dataset-modal" onClick={event => event.stopPropagation()}>
       <button className="close-button" onClick={() => setSelected(null)}>×</button><span className="eyebrow">Dataset profile</span><h2>{selected.name}</h2><p>{selected.description}</p>
       {selected.tables?.map(table => <section className="table-profile" key={table.id}><div><strong>{table.sheet_name}</strong><small>{table.row_count.toLocaleString()} 行 · {table.columns.length} 个字段</small></div><div className="column-chips">{table.columns.map(column => <span key={column.name}><b>{column.name}</b><small>{column.type}</small></span>)}</div>{table.preview.length > 0 && <div className="preview-table"><table><thead><tr>{Object.keys(table.preview[0]).map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{table.preview.slice(0, 5).map((row, index) => <tr key={index}>{Object.values(row).map((value, valueIndex) => <td key={valueIndex}>{String(value ?? "—")}</td>)}</tr>)}</tbody></table></div>}</section>)}
-      <Link className="modal-primary" href={`/?dataset=${selected.id}`}>使用这份数据开始问数 →</Link>
+      <button className="modal-primary" onClick={() => startAsking(selected)}>使用这份数据开始问数 →</button>
     </article></div>}
   </>;
 }

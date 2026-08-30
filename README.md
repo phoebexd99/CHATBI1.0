@@ -26,7 +26,7 @@ The business-first UI keeps RAG hits, SQL, and node-level Trace behind an option
 
 ## Excel / CSV data-source MVP
 
-Live mode now includes a **数据源** page. A user can upload an `.xlsx` or `.csv`, inspect the detected sheets, fields, types and preview rows, then enter the query workspace with that dataset selected. CHATBI generates dataset-specific starter questions and supports controlled totals, averages, counts, grouped comparisons, rankings and date trends. The existing commerce model remains the built-in certified demo template.
+Live mode now uses one unified **智能问数** home page: connect an `.xlsx` or `.csv`, inspect the detected sheets, fields, types and preview rows, select that dataset, and ask a natural-language question without leaving the page. CHATBI generates dataset-specific starter questions and supports controlled totals, averages, counts, grouped comparisons, rankings and date trends. The existing commerce model remains the built-in certified demo template.
 
 Uploaded source files are not kept. Normalized rows and profiling metadata are written to the gitignored local `chatbi_datasets.db` by default; set `CHATBI_DATASET_DB` to another local path if needed. Uploads are available only in Live mode because GitHub Pages Replay has no backend. See [`docs/19-excel-data-source-mvp.md`](docs/19-excel-data-source-mvp.md) for the workflow, limits, API contract and current boundary.
 
@@ -67,7 +67,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. The default question is “最近 30 天 GMV 是多少？”. Open <http://localhost:3000/data-sources> to upload an Excel/CSV file; a small downloadable CSV is included for trying the flow.
+Open <http://localhost:3000>. The home page contains the complete connect → ask → result flow. The default question is “最近 30 天 GMV 是多少？”, and a small downloadable CSV is included for trying the upload flow. The old `/data-sources` URL remains as a compatibility alias for existing bookmarks.
 
 ## Run with Docker Compose
 
