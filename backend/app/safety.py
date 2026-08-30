@@ -18,7 +18,13 @@ class SQLSafetyGate:
     ALLOWED_SCHEMAS = {"public", "chatbi_mart"}
     FORBIDDEN_FUNCTIONS = {"pg_read_file", "pg_ls_dir", "dblink", "lo_import", "lo_export"}
 
-    def validate(self, sql: str, dialect: str) -> str:
+    def validate(
+        self,
+        sql: str,
+        dialect: str,
+        allowed_tables: set[str] | None = None,
+        allowed_schemas: set[str] | None = None,
+    ) -> str:
         if "--" in sql or "/*" in sql or "*/" in sql:
             raise UnsafeSQL("SQL comments are not allowed")
         try:
@@ -35,11 +41,13 @@ class SQLSafetyGate:
             raise UnsafeSQL("DDL, DML, and commands are forbidden")
         table_nodes = list(statement.find_all(exp.Table))
         tables = {table.name.lower() for table in table_nodes}
-        unknown = tables - self.ALLOWED_TABLES
+        effective_tables = self.ALLOWED_TABLES if allowed_tables is None else {item.lower() for item in allowed_tables}
+        effective_schemas = self.ALLOWED_SCHEMAS if allowed_schemas is None else {item.lower() for item in allowed_schemas}
+        unknown = tables - effective_tables
         if unknown:
             raise UnsafeSQL(f"Table not allow-listed: {', '.join(sorted(unknown))}")
         unknown_schemas = {
-            table.db.lower() for table in table_nodes if table.db and table.db.lower() not in self.ALLOWED_SCHEMAS
+            table.db.lower() for table in table_nodes if table.db and table.db.lower() not in effective_schemas
         }
         if unknown_schemas:
             raise UnsafeSQL(f"Schema not allow-listed: {', '.join(sorted(unknown_schemas))}")

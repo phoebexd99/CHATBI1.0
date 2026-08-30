@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 from time import perf_counter
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
 from .config import settings
+from .datasets import DatasetError, DatasetService, MAX_UPLOAD_BYTES, UploadedDatasetAnalyzer
 from .db import Database
 from .retrieval import HybridRetriever, ROOT
 from .safety import SQLSafetyGate, UnsafeSQL
@@ -21,12 +23,15 @@ from .wren import make_wren_adapter
 
 class QueryRequest(BaseModel):
     question: str = Field(min_length=2, max_length=500)
+    dataset_id: str = Field(default="demo", min_length=2, max_length=80)
 
 
 database = Database(settings.database_url)
 retriever = HybridRetriever()
 catalog = SemanticCatalog()
 workflow = QueryWorkflow(database, retriever, make_wren_adapter(settings, catalog), SQLSafetyGate(), catalog)
+dataset_service = DatasetService(Path(os.getenv("CHATBI_DATASET_DB", ROOT / "chatbi_datasets.db")))
+uploaded_analyzer = UploadedDatasetAnalyzer(dataset_service)
 
 app = FastAPI(title="CHATBI API", version="0.1.0")
 app.add_middleware(
@@ -46,13 +51,15 @@ ERROR_MESSAGES = {
     "unsafe_sql": "生成的 SQL 未通过安全校验。",
     "dry_run_error": "SQL 在数据库 dry-run 阶段失败。",
     "execution_error": "查询执行失败，请稍后重试。",
+    "dataset_not_found": "所选数据集不存在或已经不可用。",
+    "dataset_error": "上传数据暂时无法完成这次分析。",
 }
 
 
-def _serialize_result(question: str, result: QueryState, started: float) -> dict:
+def _serialize_result(question: str, result: QueryState, started: float, dataset_id: str = "demo") -> dict:
     semantic_plan = result.get("semantic_plan")
     return {
-        "question": question, "intent": result.get("intent"),
+        "question": question, "dataset_id": dataset_id, "intent": result.get("intent"),
         "answer": result["answer"], "sql": result.get("sql", ""),
         "columns": result.get("columns", []), "rows": result.get("rows", []),
         "chart": result["chart_spec"], "entities": result.get("entities", {}),
@@ -82,25 +89,60 @@ def health() -> dict:
 def query(request: QueryRequest) -> dict:
     started = perf_counter()
     try:
-        result = workflow.run(request.question)
+        result = workflow.run(request.question) if request.dataset_id == "demo" else uploaded_analyzer.run(request.dataset_id, request.question)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=_error_detail("dataset_not_found")) from error
+    except DatasetError as error:
+        raise HTTPException(status_code=422, detail={"category": "dataset_error", "message": str(error)}) from error
     except (WorkflowFailure, ValueError, UnsafeSQL) as error:
         category = error.category if isinstance(error, WorkflowFailure) else str(error)
         raise HTTPException(status_code=422, detail=_error_detail(category)) from error
-    return _serialize_result(request.question, result, started)
+    return _serialize_result(request.question, result, started, request.dataset_id)
 
 
 @app.post("/api/query/stream")
 def query_stream(request: QueryRequest) -> StreamingResponse:
     def events():
         started = perf_counter()
-        for event in workflow.stream(request.question):
-            payload = event
-            if event["type"] == "result":
-                payload = {"type": "result", "result": _serialize_result(request.question, event["state"], started)}
-            elif event["type"] == "error":
-                payload = {"type": "error", "error": _error_detail(event["category"]), "trace": event.get("trace", [])}
-            yield f"data: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
+        try:
+            source = workflow.stream(request.question) if request.dataset_id == "demo" else uploaded_analyzer.stream(request.dataset_id, request.question)
+            for event in source:
+                payload = event
+                if event["type"] == "result":
+                    payload = {"type": "result", "result": _serialize_result(request.question, event["state"], started, request.dataset_id)}
+                elif event["type"] == "error":
+                    payload = {"type": "error", "error": _error_detail(event["category"]), "trace": event.get("trace", [])}
+                yield f"data: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
+        except KeyError:
+            payload = {"type": "error", "error": _error_detail("dataset_not_found"), "trace": []}
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        except DatasetError as error:
+            payload = {"type": "error", "error": {"category": "dataset_error", "message": str(error)}, "trace": []}
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/datasets")
+def datasets() -> dict:
+    items = dataset_service.list_datasets()
+    return {"total": len(items), "items": items}
+
+
+@app.get("/api/datasets/{dataset_id}")
+def dataset_detail(dataset_id: str) -> dict:
+    try:
+        return dataset_service.get_dataset(dataset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=_error_detail("dataset_not_found")) from error
+
+
+@app.post("/api/datasets/upload")
+async def upload_dataset(file: UploadFile = File(...), name: str = Form(default="")) -> dict:
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    try:
+        return dataset_service.upload(file.filename or "upload.xlsx", content, name or None)
+    except DatasetError as error:
+        raise HTTPException(status_code=422, detail={"category": "dataset_error", "message": str(error)}) from error
 
 
 @app.get("/api/knowledge")

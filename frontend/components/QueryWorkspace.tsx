@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import MetricChart from "./MetricChart";
 
 type Evidence = {
@@ -20,6 +21,10 @@ type StreamEvent =
   | { type: "trace"; trace: TraceItem; node: string }
   | { type: "result"; result: Result }
   | { type: "error"; error: { category: string; message: string }; trace: TraceItem[] };
+type Dataset = {
+  id: string; name: string; source_type: "template" | "excel" | "csv"; description: string;
+  row_count: number; table_count: number; suggestions: string[];
+};
 
 const liveSuggestions = [
   "最近 30 天 GMV 是多少？",
@@ -58,12 +63,45 @@ export default function QueryWorkspace() {
   const [expandedEvidence, setExpandedEvidence] = useState<string | null>(null);
   const [expandedTrace, setExpandedTrace] = useState<string | null>(null);
   const replay = process.env.NEXT_PUBLIC_DEMO_MODE === "replay";
-  const suggestions = replay ? replaySuggestions : liveSuggestions;
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [datasetId, setDatasetId] = useState("demo");
+  const [datasetLoading, setDatasetLoading] = useState(!replay);
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const selectedDataset = datasets.find(item => item.id === datasetId);
+  const suggestions = replay ? replaySuggestions : selectedDataset?.suggestions?.length ? selectedDataset.suggestions : liveSuggestions;
   const displayTrace = result?.trace ?? streamTrace;
   const visibleHighlights = (result?.insight?.highlights ?? []).filter(item => !/(SQL|dry[- ]run|安全门|allow[- ]list|RAG|Trace|节点)/i.test(item));
 
   const completedPhases = useMemo<Set<number>>(() => new Set<number>(displayTrace.filter(item => item.status !== "error").map(item => phaseForTrace(item.node))), [displayTrace]);
+
+  useEffect(() => {
+    const requestedDataset = new URLSearchParams(window.location.search).get("dataset");
+    if (replay) {
+      setDatasets([{ id: "demo", name: "电商经营演示模板", source_type: "template", description: "内置公开电商演示数据，可直接体验完整问数链路。", row_count: 120, table_count: 6, suggestions: replaySuggestions }]);
+      setDatasetLoading(false);
+      return;
+    }
+    fetch(`${apiBase}/api/datasets`)
+      .then(response => response.ok ? response.json() : Promise.reject(new Error(`数据集请求失败 (${response.status})`)))
+      .then((payload: { items: Dataset[] }) => {
+        setDatasets(payload.items);
+        const requested = payload.items.find(item => item.id === requestedDataset);
+        if (requested) {
+          setDatasetId(requested.id);
+          if (requested.suggestions?.[0]) setQuestion(requested.suggestions[0]);
+        }
+      })
+      .catch(() => setError("暂时无法读取数据源列表，请确认 Live API 已启动。"))
+      .finally(() => setDatasetLoading(false));
+  }, [apiBase, replay]);
+
+  function changeDataset(nextId: string) {
+    setDatasetId(nextId);
+    const next = datasets.find(item => item.id === nextId);
+    if (next?.suggestions?.[0]) setQuestion(next.suggestions[0]);
+    setResult(null); setStreamTrace([]); setStatus("idle"); setError(""); setErrorCategory("");
+  }
 
   async function ask(nextQuestion = question) {
     const trimmed = nextQuestion.trim();
@@ -78,8 +116,8 @@ export default function QueryWorkspace() {
         setStreamTrace(next.trace); setResult(next); setStatus("success"); setActivePhase(4);
         return;
       }
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"}/api/query/stream`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: trimmed }),
+      const response = await fetch(`${apiBase}/api/query/stream`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: trimmed, dataset_id: datasetId }),
       });
       if (!response.ok || !response.body) {
         const body = await response.json().catch(() => null);
@@ -122,13 +160,18 @@ export default function QueryWorkspace() {
 
   return <>
     <div className="ask-card">
-      <div className="ask-card-head"><div><span className="ask-kicker">现在想了解什么？</span><strong>用一句话描述你的经营问题</strong></div><span className="ask-mode">{replay ? "示例数据" : "实时数据"}</span></div>
+      <div className="ask-card-head"><div><span className="ask-kicker">现在想了解什么？</span><strong>用一句话描述你的经营问题</strong></div><span className="ask-mode">{replay ? "静态演示" : selectedDataset?.source_type === "template" ? "演示模板" : "已上传数据"}</span></div>
+      <div className="dataset-context">
+        <label><span>当前数据</span><select aria-label="当前数据集" value={datasetId} onChange={event => changeDataset(event.target.value)} disabled={datasetLoading || loading}>{datasetLoading && <option>正在读取数据源…</option>}{datasets.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+        <div><strong>{selectedDataset?.name ?? (datasetLoading ? "正在读取可用数据…" : "电商经营演示模板")}</strong><small>{selectedDataset?.description ?? "选择数据后，系统会根据字段自动推荐可问的问题。"}</small></div>
+        <Link href="/data-sources">{replay ? "查看数据说明" : "接入新数据"} →</Link>
+      </div>
       <div className="ask-row"><span className="ask-icon" aria-hidden="true">⌕</span><input aria-label="经营问题" value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => event.key === "Enter" && ask()} placeholder="例如：最近 30 天各区域 GMV" /><button className="ask-submit" onClick={() => ask()} disabled={loading}>{loading ? "分析中…" : "开始分析"}<span aria-hidden="true">↗</span></button></div>
       <div className="suggestions"><span>试试这样问</span>{suggestions.map(item => <button key={item} onClick={() => ask(item)} disabled={loading}>{item}</button>)}</div>
     </div>
 
     <div className={`query-status ${status}`} aria-live="polite">
-      <div className="status-heading"><span className="status-dot" /><strong>{status === "idle" ? "准备好回答你的经营问题" : status === "running" ? "正在整理你的经营结果" : status === "success" ? "结果已生成，可以继续追问" : "这次分析没有完成"}</strong><small>{replay ? "示例数据 · 静态演示" : "Live API · 实时查询"}</small></div>
+      <div className="status-heading"><span className="status-dot" /><strong>{status === "idle" ? "准备好回答你的经营问题" : status === "running" ? "正在整理你的经营结果" : status === "success" ? "结果已生成，可以继续追问" : "这次分析没有完成"}</strong><small>{replay ? "示例数据 · 静态演示" : `${selectedDataset?.name ?? "Live API"} · 实时查询`}</small></div>
       <div className="phase-track">{phases.map(([id, label], index) => <div className={`phase ${(completedPhases.has(index) && activePhase > index) || status === "success" ? "done" : activePhase === index ? "active" : ""}`} key={id}><span>{completedPhases.has(index) && (activePhase > index || status === "success") ? "✓" : index + 1}</span>{label}</div>)}</div>
       {status === "running" && <div className="live-progress-note"><span className="live-indicator" />正在准备可信的结果与图表…</div>}
     </div>

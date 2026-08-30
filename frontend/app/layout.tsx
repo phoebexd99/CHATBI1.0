@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 
 const links = [
   ["/", "智能问数"],
+  ["/data-sources", "数据源"],
   ["/knowledge", "知识中心"],
   ["/evaluations", "评测中心"],
 ];
