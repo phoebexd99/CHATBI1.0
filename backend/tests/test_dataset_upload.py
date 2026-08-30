@@ -3,6 +3,7 @@ from io import BytesIO
 from openpyxl import Workbook
 
 from backend.app.datasets import DatasetService, UploadedDatasetAnalyzer
+from backend.app.safety import SQLSafetyGate
 
 
 def test_csv_upload_profiles_data_and_answers_dynamic_question(tmp_path):
@@ -77,8 +78,9 @@ def test_uploaded_dataset_roles_can_be_confirmed_and_drive_suggestions(tmp_path)
     updated = service.update_model(dataset["id"], [
         {"table_id": table["id"], "sql_name": "col_2", "role": "dimension"},
         {"table_id": table["id"], "sql_name": "col_1", "role": "time"},
-    ])
+    ], name="门店销售数据")
 
+    assert updated["name"] == "门店销售数据"
     assert updated["tables"][0]["columns"][1]["role"] == "dimension"
     assert "按门店编号统计销售额合计" in updated["suggestions"]
 
@@ -95,3 +97,25 @@ def test_uploaded_dataset_supports_explicit_month_filter(tmp_path):
     assert result["rows"] == [["天猫", 180], ["小程序", 120]]
     assert result["entities"]["time_range"] == "2026年8月"
     assert "2026-09-01" in result["sql"]
+
+
+def test_postgres_dataset_plan_uses_qualified_table_and_postgres_dates():
+    table = {
+        "physical_table": "postgres_abc::analytics.sales",
+        "columns": [
+            {"name": "交易日期", "sql_name": "sold_at", "type": "date", "role": "time", "unique_count": 10, "sample_values": []},
+            {"name": "地区", "sql_name": "region", "type": "text", "role": "dimension", "unique_count": 2, "sample_values": ["华东", "华南"]},
+            {"name": "销售额", "sql_name": "revenue", "type": "real", "role": "measure", "unique_count": 10, "sample_values": []},
+        ],
+    }
+
+    plan = UploadedDatasetAnalyzer._plan(table, "2026年8月各地区销售额", "postgres")
+    sql = UploadedDatasetAnalyzer._sql(table, plan)
+
+    assert 'FROM "analytics"."sales"' in sql
+    assert "CAST(\"sold_at\" AS DATE)" in sql
+    assert "DATE '2026-09-01'" in sql
+    validated = SQLSafetyGate().validate(
+        sql, "postgres", allowed_tables={"sales"}, allowed_schemas={"analytics"},
+    )
+    assert '"analytics"."sales"' in validated

@@ -21,7 +21,7 @@ type StreamEvent =
   | { type: "result"; result: Result }
   | { type: "error"; error: { category: string; message: string }; trace: TraceItem[] };
 type Dataset = {
-  id: string; name: string; source_type: "template" | "excel" | "csv"; description: string;
+  id: string; name: string; source_type: "template" | "excel" | "csv" | "postgresql"; status?: string; description: string;
   row_count: number; table_count: number; suggestions: string[];
 };
 
@@ -176,7 +176,7 @@ export default function QueryWorkspace() {
 
   return <>
     <div className="ask-card">
-      <div className="ask-card-head"><div><span className="ask-kicker">现在想了解什么？</span><strong>用一句话描述你的经营问题</strong></div><span className="ask-mode">{replay ? "静态演示" : selectedDataset?.source_type === "template" ? "演示模板" : "已上传数据"}</span></div>
+      <div className="ask-card-head"><div><span className="ask-kicker">现在想了解什么？</span><strong>用一句话描述你的经营问题</strong></div><span className="ask-mode">{replay ? "静态演示" : selectedDataset?.source_type === "template" ? "演示模板" : selectedDataset?.source_type === "postgresql" ? "实时数据库" : "已上传数据"}</span></div>
       <div className="dataset-context">
         <label><span>当前数据</span><select aria-label="当前数据集" value={datasetId} onChange={event => changeDataset(event.target.value)} disabled={datasetLoading || loading}>{datasetLoading && <option>正在读取数据源…</option>}{datasets.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
         <div><strong>{selectedDataset?.name ?? (datasetLoading ? "正在读取可用数据…" : "电商经营演示模板")}</strong><small>{selectedDataset?.description ?? "选择数据后，系统会根据字段自动推荐可问的问题。"}</small></div>

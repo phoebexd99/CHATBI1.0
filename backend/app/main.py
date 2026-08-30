@@ -28,12 +28,24 @@ class QueryRequest(BaseModel):
 
 class ColumnRoleAssignment(BaseModel):
     table_id: str = Field(min_length=2, max_length=100)
-    sql_name: str = Field(pattern=r"^col_\d+$")
+    sql_name: str = Field(min_length=1, max_length=128)
     role: str = Field(pattern=r"^(time|measure|dimension|identifier)$")
 
 
 class DatasetModelRequest(BaseModel):
     columns: list[ColumnRoleAssignment] = Field(min_length=1, max_length=500)
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+
+
+class PostgresConnectRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    host: str = Field(min_length=1, max_length=253)
+    port: int = Field(default=5432, ge=1, le=65535)
+    database: str = Field(min_length=1, max_length=128)
+    username: str = Field(min_length=1, max_length=128)
+    password: str = Field(max_length=512)
+    schema_name: str = Field(default="public", min_length=1, max_length=63)
+    sslmode: str = Field(default="prefer", pattern=r"^(disable|allow|prefer|require|verify-ca|verify-full)$")
 
 
 database = Database(settings.database_url)
@@ -158,9 +170,23 @@ async def upload_dataset(file: UploadFile = File(...), name: str = Form(default=
 @app.post("/api/datasets/{dataset_id}/model")
 def update_dataset_model(dataset_id: str, request: DatasetModelRequest) -> dict:
     try:
-        return dataset_service.update_model(dataset_id, [item.model_dump() for item in request.columns])
+        return dataset_service.update_model(
+            dataset_id, [item.model_dump() for item in request.columns], request.name,
+        )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=_error_detail("dataset_not_found")) from error
+    except DatasetError as error:
+        raise HTTPException(status_code=422, detail={"category": "dataset_error", "message": str(error)}) from error
+
+
+@app.post("/api/datasets/connect/postgresql")
+def connect_postgresql(request: PostgresConnectRequest) -> dict:
+    try:
+        return dataset_service.connect_postgres(
+            name=request.name, host=request.host, port=request.port,
+            database_name=request.database, username=request.username, password=request.password,
+            schema=request.schema_name, sslmode=request.sslmode,
+        )
     except DatasetError as error:
         raise HTTPException(status_code=422, detail={"category": "dataset_error", "message": str(error)}) from error
 

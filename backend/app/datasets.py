@@ -9,6 +9,7 @@ import re
 import sqlite3
 from time import perf_counter
 from typing import Any, Iterator
+from urllib.parse import quote, urlencode
 from uuid import uuid4
 
 from .db import Database
@@ -20,6 +21,7 @@ MAX_ROWS_PER_TABLE = 100_000
 MAX_COLUMNS = 100
 MAX_SHEETS = 10
 ALLOWED_COLUMN_ROLES = {"time", "measure", "dimension", "identifier"}
+MAX_DATABASE_TABLES = 20
 
 
 def _json_value(value: Any) -> Any:
@@ -62,6 +64,7 @@ class DatasetService:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.database = Database(f"sqlite:///{path}")
+        self.external_urls: dict[str, str] = {}
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -144,7 +147,7 @@ class DatasetService:
         result["tables"] = [self._table_row(item, include_internal=include_internal) for item in tables]
         return result
 
-    def update_model(self, dataset_id: str, assignments: list[dict[str, str]]) -> dict[str, Any]:
+    def update_model(self, dataset_id: str, assignments: list[dict[str, str]], name: str | None = None) -> dict[str, Any]:
         if dataset_id == "demo":
             raise DatasetError("演示模板使用认证字段模型，不能在上传数据建模页修改")
         with self._connect() as connection:
@@ -179,17 +182,141 @@ class DatasetService:
             suggestion_tables = [{"columns": json.loads(row["columns_json"])} for row in refreshed_rows]
             suggestions = self._suggest_questions(suggestion_tables)
             connection.execute(
-                "UPDATE chatbi_datasets SET suggestions_json = ? WHERE id = ?",
-                (json.dumps(suggestions, ensure_ascii=False), dataset_id),
+                "UPDATE chatbi_datasets SET suggestions_json = ?, name = ? WHERE id = ?",
+                (json.dumps(suggestions, ensure_ascii=False), (name or dataset["name"]).strip()[:80] or dataset["name"], dataset_id),
             )
             connection.commit()
         return self.get_dataset(dataset_id)
 
+    def connect_postgres(
+        self, *, name: str, host: str, port: int, database_name: str,
+        username: str, password: str, schema: str = "public", sslmode: str = "prefer",
+    ) -> dict[str, Any]:
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_$-]{0,62}", schema):
+            raise DatasetError("Schema 名称格式不正确")
+        query = urlencode({
+            "sslmode": sslmode,
+            "connect_timeout": 6,
+            "options": "-c default_transaction_read_only=on -c statement_timeout=10000",
+        })
+        url = (
+            f"postgresql://{quote(username, safe='')}:{quote(password, safe='')}@"
+            f"{host}:{port}/{quote(database_name, safe='')}?{query}"
+        )
+        try:
+            import psycopg
+            from psycopg import sql as pg_sql
+
+            with psycopg.connect(url) as connection:
+                connection.execute("SET TRANSACTION READ ONLY")
+                rows = connection.execute(
+                    """
+                    SELECT c.table_name, c.column_name, c.data_type, c.is_nullable
+                    FROM information_schema.columns c
+                    JOIN information_schema.tables t
+                      ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+                    WHERE c.table_schema = %s AND t.table_type IN ('BASE TABLE', 'VIEW')
+                    ORDER BY c.table_name, c.ordinal_position
+                    """,
+                    (schema,),
+                ).fetchall()
+                if not rows:
+                    raise DatasetError(f"Schema“{schema}”中没有可读取的表或视图")
+                grouped: dict[str, list[tuple[Any, ...]]] = {}
+                for row in rows:
+                    grouped.setdefault(row[0], []).append(row)
+                table_names = list(grouped)[:MAX_DATABASE_TABLES]
+                dataset_id = f"postgres_{uuid4().hex[:12]}"
+                payloads: list[dict[str, Any]] = []
+                total_rows = 0
+                for index, table_name in enumerate(table_names, start=1):
+                    estimate_row = connection.execute(
+                        """
+                        SELECT GREATEST(c.reltuples::bigint, 0)
+                        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE n.nspname = %s AND c.relname = %s
+                        """,
+                        (schema, table_name),
+                    ).fetchone()
+                    row_count = int(estimate_row[0]) if estimate_row else 0
+                    total_rows += row_count
+                    columns: list[dict[str, Any]] = []
+                    for column_row in grouped[table_name][:MAX_COLUMNS]:
+                        column_name, pg_type, nullable = column_row[1], column_row[2], column_row[3]
+                        inferred = self._postgres_type(pg_type)
+                        columns.append({
+                            "name": column_name, "sql_name": column_name, "type": inferred,
+                            "nullable": nullable == "YES", "non_null_ratio": None,
+                            "unique_count": 0, "sample_values": [],
+                            "role": self._infer_role(column_name, inferred, 0, max(row_count, 1)),
+                        })
+                    for column in [item for item in columns if item["role"] == "dimension"][:5]:
+                        sample_query = pg_sql.SQL(
+                            "SELECT DISTINCT {} FROM {}.{} WHERE {} IS NOT NULL LIMIT 20"
+                        ).format(
+                            pg_sql.Identifier(column["sql_name"]), pg_sql.Identifier(schema),
+                            pg_sql.Identifier(table_name), pg_sql.Identifier(column["sql_name"]),
+                        )
+                        values = connection.execute(sample_query).fetchall()
+                        column["sample_values"] = [str(value[0]) for value in values]
+                        column["unique_count"] = len(values)
+                    payloads.append({
+                        "id": f"{dataset_id}.table_{index}", "sheet_name": table_name,
+                        "physical_table": f"{dataset_id}::{schema}.{table_name}",
+                        "row_count": row_count, "columns": columns, "preview": [],
+                    })
+        except DatasetError:
+            raise
+        except Exception as error:
+            raise DatasetError(f"数据库连接失败：{type(error).__name__}") from error
+
+        dataset_name = name.strip()[:80] or f"{database_name} 数据库"
+        suggestions = self._suggest_questions(payloads)
+        description = (
+            f"PostgreSQL {host}:{port}/{database_name} · {schema}，"
+            f"已发现 {len(payloads)} 张可读表；连接凭据仅保留在当前 API 进程。"
+        )
+        created_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        with self._connect() as metadata_connection:
+            metadata_connection.execute(
+                "INSERT INTO chatbi_datasets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (dataset_id, dataset_name, "postgresql", f"{host}:{port}/{database_name}/{schema}",
+                 description, total_rows, len(payloads), json.dumps(suggestions, ensure_ascii=False), created_at),
+            )
+            for payload in payloads:
+                metadata_connection.execute(
+                    "INSERT INTO chatbi_dataset_tables VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (payload["id"], dataset_id, payload["sheet_name"], payload["physical_table"],
+                     payload["row_count"], json.dumps(payload["columns"], ensure_ascii=False), "[]"),
+                )
+            metadata_connection.commit()
+        self.external_urls[dataset_id] = url
+        return self.get_dataset(dataset_id)
+
+    def database_for(self, dataset_id: str, source_type: str) -> Database:
+        if source_type != "postgresql":
+            return self.database
+        url = self.external_urls.get(dataset_id)
+        if not url:
+            raise DatasetError("数据库凭据未持久化；API 重启后请重新连接该 PostgreSQL 数据源")
+        return Database(url)
+
     @staticmethod
-    def _dataset_row(row: sqlite3.Row) -> dict[str, Any]:
+    def _postgres_type(data_type: str) -> str:
+        lowered = data_type.lower()
+        if "date" in lowered or "timestamp" in lowered:
+            return "date"
+        if lowered in {"smallint", "integer", "bigint"}:
+            return "integer"
+        if lowered in {"numeric", "decimal", "real", "double precision", "money"}:
+            return "real"
+        return "text"
+
+    def _dataset_row(self, row: sqlite3.Row) -> dict[str, Any]:
         return {
             "id": row["id"], "name": row["name"], "source_type": row["source_type"],
-            "status": "ready", "description": row["description"],
+            "status": "reconnect_required" if row["source_type"] == "postgresql" and row["id"] not in self.external_urls else "ready",
+            "description": row["description"],
             "row_count": row["row_count"], "table_count": row["table_count"],
             "created_at": row["created_at"], "suggestions": json.loads(row["suggestions_json"]),
         }
@@ -386,7 +513,7 @@ class DatasetService:
         normalized_name = name.lower().replace("_", "").replace(" ", "")
         identifier_markers = ("id", "编号", "编码", "单号", "订单号", "客户号", "商品号", "sku")
         looks_like_identifier = any(marker in normalized_name for marker in identifier_markers)
-        if looks_like_identifier and unique_count >= max(1, int(row_count * 0.7)):
+        if looks_like_identifier and (unique_count == 0 or unique_count >= max(1, int(row_count * 0.7))):
             return "identifier"
         if inferred == "date":
             return "time"
@@ -439,11 +566,13 @@ class UploadedDatasetAnalyzer:
         dataset = self.service.get_dataset(dataset_id, include_internal=True)
         if dataset_id == "demo":
             raise DatasetError("演示数据应使用认证指标工作流")
+        dialect = "postgres" if dataset["source_type"] == "postgresql" else "sqlite"
+        query_database = self.service.database_for(dataset_id, dataset["source_type"])
         table = self._select_table(dataset, question)
         yield stage("classify", f"已选择数据集“{dataset['name']}”", started)
 
         started = perf_counter()
-        plan = self._plan(table, question)
+        plan = self._plan(table, question, dialect)
         yield stage("extract_entities", f"识别分析字段：{plan['metric_label']}", started)
 
         started = perf_counter()
@@ -455,12 +584,16 @@ class UploadedDatasetAnalyzer:
         yield stage("generate_sql", "已生成受控聚合查询", started)
 
         started = perf_counter()
-        sql = self.safety.validate(sql, "sqlite", allowed_tables={table["physical_table"]}, allowed_schemas=set())
-        self.service.database.explain(sql)
+        table_schema, table_name = self._table_parts(table)
+        sql = self.safety.validate(
+            sql, dialect, allowed_tables={table_name},
+            allowed_schemas={table_schema} if table_schema else set(),
+        )
+        query_database.explain(sql)
         yield stage("safety", "查询只访问当前上传数据集并已通过只读校验", started)
 
         started = perf_counter()
-        columns, rows = self.service.database.query(sql, max_rows=100)
+        columns, rows = query_database.query(sql, max_rows=100)
         display_columns = [plan["group_label"], plan["metric_label"]] if plan["group_sql"] else [plan["metric_label"]]
         yield stage("execute", f"查询完成，返回 {len(rows)} 行", started)
 
@@ -495,7 +628,7 @@ class UploadedDatasetAnalyzer:
         return max(dataset["tables"], key=score)
 
     @staticmethod
-    def _plan(table: dict[str, Any], question: str) -> dict[str, Any]:
+    def _plan(table: dict[str, Any], question: str, dialect: str = "sqlite") -> dict[str, Any]:
         numeric = [item for item in table["columns"] if item.get("role", "measure" if item["type"] in {"integer", "real"} else "") == "measure"]
         dates = [item for item in table["columns"] if item.get("role", "time" if item["type"] == "date" else "") == "time"]
         categories = [item for item in table["columns"] if item.get("role", "dimension" if item["type"] == "text" else "") == "dimension" and item["unique_count"] <= 100]
@@ -510,7 +643,10 @@ class UploadedDatasetAnalyzer:
         group_kind = group["type"] if group else ""
         group_label = group["name"] if group else ""
         if group and group["type"] == "date" and any(marker in question for marker in ("按月", "每月", "月度")):
-            group_sql = f"substr({_quote(group['sql_name'])}, 1, 7)"
+            group_sql = (
+                f"TO_CHAR({_quote(group['sql_name'])}, 'YYYY-MM')"
+                if dialect == "postgres" else f"substr({_quote(group['sql_name'])}, 1, 7)"
+            )
             group_label = f"{group['name']}（月）"
         metric_sql = "COUNT(*)" if operation == "count" else f"{operation.upper()}({_quote(metric['sql_name'])})"
         operation_label = {"count": "记录数", "sum": "合计", "avg": "平均值", "max": "最大值", "min": "最小值"}[operation]
@@ -532,18 +668,30 @@ class UploadedDatasetAnalyzer:
             year, month = int(month_match.group(1)), int(month_match.group(2))
             next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
             date_sql = _quote(dates[0]["sql_name"])
-            where_clauses.extend([
-                f"date({date_sql}) >= date('{year:04d}-{month:02d}-01')",
-                f"date({date_sql}) < date('{next_year:04d}-{next_month:02d}-01')",
-            ])
+            if dialect == "postgres":
+                where_clauses.extend([
+                    f"CAST({date_sql} AS DATE) >= DATE '{year:04d}-{month:02d}-01'",
+                    f"CAST({date_sql} AS DATE) < DATE '{next_year:04d}-{next_month:02d}-01'",
+                ])
+            else:
+                where_clauses.extend([
+                    f"date({date_sql}) >= date('{year:04d}-{month:02d}-01')",
+                    f"date({date_sql}) < date('{next_year:04d}-{next_month:02d}-01')",
+                ])
             filter_labels.append(f"{year}年{month}月")
         elif dates and year_match:
             year = int(year_match.group(1))
             date_sql = _quote(dates[0]["sql_name"])
-            where_clauses.extend([
-                f"date({date_sql}) >= date('{year:04d}-01-01')",
-                f"date({date_sql}) < date('{year + 1:04d}-01-01')",
-            ])
+            if dialect == "postgres":
+                where_clauses.extend([
+                    f"CAST({date_sql} AS DATE) >= DATE '{year:04d}-01-01'",
+                    f"CAST({date_sql} AS DATE) < DATE '{year + 1:04d}-01-01'",
+                ])
+            else:
+                where_clauses.extend([
+                    f"date({date_sql}) >= date('{year:04d}-01-01')",
+                    f"date({date_sql}) < date('{year + 1:04d}-01-01')",
+                ])
             filter_labels.append(f"{year}年")
         return {"operation": operation, "metric": metric, "metric_sql": metric_sql, "metric_label": metric_label,
                 "group": group, "group_sql": group_sql, "group_kind": group_kind, "group_label": group_label,
@@ -560,7 +708,18 @@ class UploadedDatasetAnalyzer:
             select = f"{plan['group_sql']} AS group_value, {select}"
             group = f" GROUP BY {plan['group_sql']}"
             order = " ORDER BY metric_value DESC"
-        return f"SELECT {select} FROM {_quote(table['physical_table'])}{where}{group}{order} LIMIT {plan['limit']}"
+        table_schema, table_name = UploadedDatasetAnalyzer._table_parts(table)
+        table_sql = f"{_quote(table_schema)}.{_quote(table_name)}" if table_schema else _quote(table_name)
+        return f"SELECT {select} FROM {table_sql}{where}{group}{order} LIMIT {plan['limit']}"
+
+    @staticmethod
+    def _table_parts(table: dict[str, Any]) -> tuple[str, str]:
+        physical = table["physical_table"]
+        if "::" not in physical:
+            return "", physical
+        qualified = physical.split("::", 1)[1]
+        schema, table_name = qualified.split(".", 1)
+        return schema, table_name
 
     @staticmethod
     def _context(dataset: dict[str, Any], table: dict[str, Any], plan: dict[str, Any]) -> list[dict[str, Any]]:

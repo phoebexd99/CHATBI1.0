@@ -24,13 +24,13 @@ For the consolidated project positioning, Olist-based attribution boundary, end-
 
 The business-first UI keeps RAG hits, SQL, and node-level Trace behind an optional verification panel. To run the API-backed Live page locally, see [`docs/18-live-mode-and-api.md`](docs/18-live-mode-and-api.md).
 
-## Excel / CSV data-source MVP
+## File and database data-source MVP
 
-Live mode now uses one unified **智能问数** home page: connect an `.xlsx` or `.csv`, inspect the detected sheets, fields, types and preview rows, select that dataset, and ask a natural-language question without leaving the page. CHATBI generates dataset-specific starter questions and supports controlled totals, averages, counts, grouped comparisons, rankings and date trends. The existing commerce model remains the built-in certified demo template.
+Live mode now uses one unified **智能问数** home page with three explicit entry points: upload an `.xlsx` / `.csv`, connect a read-only PostgreSQL database, or open a guided picker for the commerce demo and previously connected data. Dataset choices are kept inside the picker instead of appearing as an unexplained list on the home page. After selecting a source, the user can inspect its fields and ask a natural-language question without leaving the page. CHATBI generates dataset-specific starter questions and supports controlled totals, averages, counts, grouped comparisons, rankings and date trends. The existing commerce model remains the built-in certified demo template.
 
 The upload profile now assigns each field a business role—time, measure, dimension, or identifier—and lets the user confirm or correct it before querying. Uploaded-data questions can apply detected category values and explicit year/month ranges, so prompts such as “2026 年 8 月华东销售额合计” generate scoped, read-only SQL instead of silently analyzing all rows.
 
-Uploaded source files are not kept. Normalized rows and profiling metadata are written to the gitignored local `chatbi_datasets.db` by default; set `CHATBI_DATASET_DB` to another local path if needed. Uploads are available only in Live mode because GitHub Pages Replay has no backend. See [`docs/19-excel-data-source-mvp.md`](docs/19-excel-data-source-mvp.md) for the workflow, limits, API contract and current boundary.
+Uploaded source files are not kept. Normalized rows and profiling metadata are written to the gitignored local `chatbi_datasets.db` by default; set `CHATBI_DATASET_DB` to another local path if needed. PostgreSQL passwords are never stored in SQLite, browser storage, Git, or logs: the connection URL exists only in the current API process, so a database must be reconnected after an API restart. Both uploads and database connections are available only in Live mode because GitHub Pages Replay has no backend. See [`docs/19-excel-data-source-mvp.md`](docs/19-excel-data-source-mvp.md) for the workflow, limits, API contract and current boundary.
 
 ## Day 1 status
 
