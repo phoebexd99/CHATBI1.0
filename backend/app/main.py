@@ -26,6 +26,16 @@ class QueryRequest(BaseModel):
     dataset_id: str = Field(default="demo", min_length=2, max_length=80)
 
 
+class ColumnRoleAssignment(BaseModel):
+    table_id: str = Field(min_length=2, max_length=100)
+    sql_name: str = Field(pattern=r"^col_\d+$")
+    role: str = Field(pattern=r"^(time|measure|dimension|identifier)$")
+
+
+class DatasetModelRequest(BaseModel):
+    columns: list[ColumnRoleAssignment] = Field(min_length=1, max_length=500)
+
+
 database = Database(settings.database_url)
 retriever = HybridRetriever()
 catalog = SemanticCatalog()
@@ -141,6 +151,16 @@ async def upload_dataset(file: UploadFile = File(...), name: str = Form(default=
     content = await file.read(MAX_UPLOAD_BYTES + 1)
     try:
         return dataset_service.upload(file.filename or "upload.xlsx", content, name or None)
+    except DatasetError as error:
+        raise HTTPException(status_code=422, detail={"category": "dataset_error", "message": str(error)}) from error
+
+
+@app.post("/api/datasets/{dataset_id}/model")
+def update_dataset_model(dataset_id: str, request: DatasetModelRequest) -> dict:
+    try:
+        return dataset_service.update_model(dataset_id, [item.model_dump() for item in request.columns])
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=_error_detail("dataset_not_found")) from error
     except DatasetError as error:
         raise HTTPException(status_code=422, detail={"category": "dataset_error", "message": str(error)}) from error
 

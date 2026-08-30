@@ -2,7 +2,8 @@
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 
-type Column = { name: string; type: string; nullable?: boolean; unique_count?: number; sample_values?: string[] };
+type ColumnRole = "time" | "measure" | "dimension" | "identifier";
+type Column = { name: string; sql_name?: string; type: string; role?: ColumnRole; nullable?: boolean; non_null_ratio?: number; unique_count?: number; sample_values?: string[] };
 type DatasetTable = { id: string; sheet_name: string; row_count: number; columns: Column[]; preview: Record<string, unknown>[] };
 type Dataset = {
   id: string; name: string; source_type: "template" | "excel" | "csv"; status: string; description: string;
@@ -15,9 +16,18 @@ const replayDemo: Dataset = {
   row_count: 120, table_count: 6, created_at: null,
   suggestions: ["最近 30 天 GMV 是多少？", "最近 30 天各渠道退款率", "最近 30 天各活动 ROAS 排名", "今天各品类可用库存"],
   tables: [{ id: "demo.orders", sheet_name: "订单", row_count: 120, columns: [
-    { name: "订单日期", type: "date" }, { name: "渠道", type: "text" }, { name: "区域", type: "text" }, { name: "成交金额", type: "real" },
+    { name: "订单日期", type: "date", role: "time" }, { name: "渠道", type: "text", role: "dimension" }, { name: "区域", type: "text", role: "dimension" }, { name: "成交金额", type: "real", role: "measure" },
   ], preview: [] }],
 };
+
+const roleLabels: Record<ColumnRole, string> = { time: "时间", measure: "指标", dimension: "维度", identifier: "标识" };
+
+function inferredRole(column: Column): ColumnRole {
+  if (column.role) return column.role;
+  if (column.type === "date") return "time";
+  if (["integer", "real"].includes(column.type)) return "measure";
+  return "dimension";
+}
 
 export default function DataSourceCenter() {
   const replay = process.env.NEXT_PUBLIC_DEMO_MODE === "replay";
@@ -30,6 +40,8 @@ export default function DataSourceCenter() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(!replay);
   const [uploading, setUploading] = useState(false);
+  const [savingModel, setSavingModel] = useState(false);
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, ColumnRole>>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -48,6 +60,15 @@ export default function DataSourceCenter() {
     if (next && !name) setName(next.name.replace(/\.(xlsx|csv)$/i, ""));
   }
 
+  function openProfile(dataset: Dataset) {
+    const drafts: Record<string, ColumnRole> = {};
+    dataset.tables?.forEach(table => table.columns.forEach(column => {
+      if (column.sql_name) drafts[`${table.id}:${column.sql_name}`] = inferredRole(column);
+    }));
+    setRoleDrafts(drafts);
+    setSelected(dataset);
+  }
+
   async function upload(event: FormEvent) {
     event.preventDefault();
     if (!file) { setError("请先选择一个 .xlsx 或 .csv 文件。"); return; }
@@ -59,7 +80,7 @@ export default function DataSourceCenter() {
       if (!response.ok) throw new Error(payload?.detail?.message ?? `上传失败 (${response.status})`);
       const created = payload as Dataset;
       setDatasets(current => [current[0] ?? replayDemo, created, ...current.slice(1).filter(item => item.id !== created.id)]);
-      setSelected(created); setMessage(`“${created.name}”已完成字段识别，可以开始问数。`);
+      openProfile(created); setMessage(`“${created.name}”已完成字段识别，请确认字段用途后开始问数。`);
       window.dispatchEvent(new CustomEvent("chatbi:dataset-created", { detail: created }));
       setFile(null); setName(""); if (inputRef.current) inputRef.current.value = "";
     } catch (caught) {
@@ -68,13 +89,35 @@ export default function DataSourceCenter() {
   }
 
   async function inspect(dataset: Dataset) {
-    if (dataset.tables || replay) { setSelected(dataset); return; }
+    if (dataset.tables || replay) { openProfile(dataset); return; }
     setError("");
     try {
       const response = await fetch(`${apiBase}/api/datasets/${dataset.id}`);
       if (!response.ok) throw new Error(`数据画像读取失败 (${response.status})`);
-      setSelected(await response.json() as Dataset);
+      openProfile(await response.json() as Dataset);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "无法读取数据画像"); }
+  }
+
+  async function saveModel() {
+    if (!selected?.tables || selected.source_type === "template") return;
+    const columns = selected.tables.flatMap(table => table.columns.filter(column => column.sql_name).map(column => ({
+      table_id: table.id, sql_name: column.sql_name as string,
+      role: roleDrafts[`${table.id}:${column.sql_name}`] ?? inferredRole(column),
+    })));
+    setSavingModel(true); setError("");
+    try {
+      const response = await fetch(`${apiBase}/api/datasets/${selected.id}/model`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ columns }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.detail?.message ?? `字段设置保存失败 (${response.status})`);
+      const updated = payload as Dataset;
+      setDatasets(current => current.map(item => item.id === updated.id ? { ...item, ...updated } : item));
+      openProfile(updated);
+      window.dispatchEvent(new CustomEvent("chatbi:dataset-selected", { detail: updated }));
+      setMessage(`“${updated.name}”的字段用途已保存，推荐问题已同步更新。`);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "字段设置保存失败"); }
+    finally { setSavingModel(false); }
   }
 
   function startAsking(dataset: Dataset) {
@@ -123,8 +166,9 @@ export default function DataSourceCenter() {
 
     {selected && <div className="modal-backdrop" onClick={() => setSelected(null)}><article className="detail-modal dataset-modal" onClick={event => event.stopPropagation()}>
       <button className="close-button" onClick={() => setSelected(null)}>×</button><span className="eyebrow">Dataset profile</span><h2>{selected.name}</h2><p>{selected.description}</p>
-      {selected.tables?.map(table => <section className="table-profile" key={table.id}><div><strong>{table.sheet_name}</strong><small>{table.row_count.toLocaleString()} 行 · {table.columns.length} 个字段</small></div><div className="column-chips">{table.columns.map(column => <span key={column.name}><b>{column.name}</b><small>{column.type}</small></span>)}</div>{table.preview.length > 0 && <div className="preview-table"><table><thead><tr>{Object.keys(table.preview[0]).map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{table.preview.slice(0, 5).map((row, index) => <tr key={index}>{Object.values(row).map((value, valueIndex) => <td key={valueIndex}>{String(value ?? "—")}</td>)}</tr>)}</tbody></table></div>}</section>)}
-      <button className="modal-primary" onClick={() => startAsking(selected)}>使用这份数据开始问数 →</button>
+      <div className="role-guide"><span><i className="role-time" />时间：用于年月筛选和趋势</span><span><i className="role-measure" />指标：用于求和、平均和比较</span><span><i className="role-dimension" />维度：用于分类和筛选</span><span><i className="role-identifier" />标识：仅定位记录，不参与求和</span></div>
+      {selected.tables?.map(table => <section className="table-profile" key={table.id}><div><strong>{table.sheet_name}</strong><small>{table.row_count.toLocaleString()} 行 · {table.columns.length} 个字段</small></div><div className="column-model-grid">{table.columns.map(column => { const key = `${table.id}:${column.sql_name}`; const role = roleDrafts[key] ?? inferredRole(column); return <label key={column.name}><span><b>{column.name}</b><small>{column.type} · 完整率 {Math.round((column.non_null_ratio ?? 1) * 100)}%</small></span>{selected.source_type === "template" || !column.sql_name ? <em>{roleLabels[role]}</em> : <select aria-label={`${column.name}字段用途`} value={role} onChange={event => setRoleDrafts(current => ({ ...current, [key]: event.target.value as ColumnRole }))}><option value="time">时间</option><option value="measure">指标</option><option value="dimension">维度</option><option value="identifier">标识</option></select>}</label>; })}</div>{table.preview.length > 0 && <div className="preview-table"><table><thead><tr>{Object.keys(table.preview[0]).map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{table.preview.slice(0, 5).map((row, index) => <tr key={index}>{Object.values(row).map((value, valueIndex) => <td key={valueIndex}>{String(value ?? "—")}</td>)}</tr>)}</tbody></table></div>}</section>)}
+      <div className="model-actions">{selected.source_type !== "template" && <button className="technical-toggle" onClick={saveModel} disabled={savingModel}>{savingModel ? "保存中…" : "保存字段设置"}</button>}<button className="modal-primary" onClick={() => startAsking(selected)}>使用这份数据开始问数 →</button></div>
     </article></div>}
   </>;
 }

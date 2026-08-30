@@ -19,6 +19,7 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_ROWS_PER_TABLE = 100_000
 MAX_COLUMNS = 100
 MAX_SHEETS = 10
+ALLOWED_COLUMN_ROLES = {"time", "measure", "dimension", "identifier"}
 
 
 def _json_value(value: Any) -> Any:
@@ -29,6 +30,10 @@ def _json_value(value: Any) -> Any:
 
 def _quote(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
+
+
+def _literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
 def _format_number(value: Any) -> str:
@@ -138,6 +143,47 @@ class DatasetService:
         result = self._dataset_row(row)
         result["tables"] = [self._table_row(item, include_internal=include_internal) for item in tables]
         return result
+
+    def update_model(self, dataset_id: str, assignments: list[dict[str, str]]) -> dict[str, Any]:
+        if dataset_id == "demo":
+            raise DatasetError("演示模板使用认证字段模型，不能在上传数据建模页修改")
+        with self._connect() as connection:
+            dataset = connection.execute("SELECT * FROM chatbi_datasets WHERE id = ?", (dataset_id,)).fetchone()
+            if not dataset:
+                raise KeyError(dataset_id)
+            rows = connection.execute(
+                "SELECT * FROM chatbi_dataset_tables WHERE dataset_id = ? ORDER BY id", (dataset_id,)
+            ).fetchall()
+            table_map = {row["id"]: row for row in rows}
+            columns_by_table = {row["id"]: json.loads(row["columns_json"]) for row in rows}
+            for assignment in assignments:
+                role = assignment["role"]
+                if role not in ALLOWED_COLUMN_ROLES:
+                    raise DatasetError(f"不支持的字段角色：{role}")
+                row = table_map.get(assignment["table_id"])
+                if not row:
+                    raise DatasetError("字段设置引用了不属于当前数据集的工作表")
+                columns = columns_by_table[row["id"]]
+                column = next((item for item in columns if item["sql_name"] == assignment["sql_name"]), None)
+                if not column:
+                    raise DatasetError("字段设置引用了不存在的字段")
+                column["role"] = role
+            for table_id, columns in columns_by_table.items():
+                connection.execute(
+                    "UPDATE chatbi_dataset_tables SET columns_json = ? WHERE id = ?",
+                    (json.dumps(columns, ensure_ascii=False), table_id),
+                )
+            refreshed_rows = connection.execute(
+                "SELECT * FROM chatbi_dataset_tables WHERE dataset_id = ? ORDER BY id", (dataset_id,)
+            ).fetchall()
+            suggestion_tables = [{"columns": json.loads(row["columns_json"])} for row in refreshed_rows]
+            suggestions = self._suggest_questions(suggestion_tables)
+            connection.execute(
+                "UPDATE chatbi_datasets SET suggestions_json = ? WHERE id = ?",
+                (json.dumps(suggestions, ensure_ascii=False), dataset_id),
+            )
+            connection.commit()
+        return self.get_dataset(dataset_id)
 
     @staticmethod
     def _dataset_row(row: sqlite3.Row) -> dict[str, Any]:
@@ -281,8 +327,12 @@ class DatasetService:
                 "name": header, "sql_name": f"col_{column_index + 1}", "type": inferred,
                 "sqlite_type": "INTEGER" if inferred == "integer" else "REAL" if inferred == "real" else "TEXT",
                 "nullable": len(non_null) != len(normalized), "unique_count": len(unique_values),
-                "sample_values": unique_values[:5],
+                "non_null_ratio": round(len(non_null) / len(normalized), 4) if normalized else 0,
+                "sample_values": unique_values[:20],
             })
+            columns[-1]["role"] = DatasetService._infer_role(
+                header, inferred, len(unique_values), len(normalized)
+            )
         normalized_rows = [list(values) for values in zip(*normalized_columns)] if normalized_columns else []
         preview = [
             {headers[column_index]: _json_value(row[column_index]) for column_index in range(width)}
@@ -332,13 +382,26 @@ class DatasetService:
         return str(value).strip()
 
     @staticmethod
+    def _infer_role(name: str, inferred: str, unique_count: int, row_count: int) -> str:
+        normalized_name = name.lower().replace("_", "").replace(" ", "")
+        identifier_markers = ("id", "编号", "编码", "单号", "订单号", "客户号", "商品号", "sku")
+        looks_like_identifier = any(marker in normalized_name for marker in identifier_markers)
+        if looks_like_identifier and unique_count >= max(1, int(row_count * 0.7)):
+            return "identifier"
+        if inferred == "date":
+            return "time"
+        if inferred in {"integer", "real"}:
+            return "measure"
+        return "dimension"
+
+    @staticmethod
     def _suggest_questions(tables: list[dict[str, Any]]) -> list[str]:
         suggestions: list[str] = []
         for table in tables:
             columns = table["columns"]
-            numeric = [item for item in columns if item["type"] in {"integer", "real"}]
-            dates = [item for item in columns if item["type"] == "date"]
-            categories = [item for item in columns if item["type"] == "text" and 1 < item["unique_count"] <= 100]
+            numeric = [item for item in columns if item.get("role") == "measure"]
+            dates = [item for item in columns if item.get("role") == "time"]
+            categories = [item for item in columns if item.get("role") == "dimension" and 1 < item["unique_count"] <= 100]
             if numeric:
                 suggestions.extend([f"{numeric[0]['name']}总计是多少？", f"{numeric[0]['name']}平均值是多少？"])
             if numeric and categories:
@@ -411,7 +474,9 @@ class UploadedDatasetAnalyzer:
             "question": question, "intent": "metric_query", "answer": answer, "sql": sql,
             "columns": display_columns, "rows": rows,
             "chart_spec": {"type": chart_type, "x": display_columns[0] if len(display_columns) > 1 else None, "y": display_columns[-1]},
-            "entities": {"metric": plan["metric_label"], "dimensions": [plan["group_label"]] if plan["group_sql"] else [], "time_range": "all_time", "filters": {}},
+            "entities": {"metric": plan["metric_label"], "dimensions": [plan["group_label"]] if plan["group_sql"] else [],
+                         "time_range": next((item for item in plan["filter_labels"] if "年" in item), "all_time"),
+                         "filters": {"applied": plan["filter_labels"]}},
             "retrieval_summary": {"hits": len(context), "top_score": 1.0, "certified_hits": 0, "target_hit": True},
             "evidence": context,
             "insight": {"title": "数据概览", "summary": answer, "highlights": [f"数据集：{dataset['name']}", f"工作表：{table['sheet_name']}", f"返回 {len(rows)} 行结果"]},
@@ -431,9 +496,9 @@ class UploadedDatasetAnalyzer:
 
     @staticmethod
     def _plan(table: dict[str, Any], question: str) -> dict[str, Any]:
-        numeric = [item for item in table["columns"] if item["type"] in {"integer", "real"}]
-        dates = [item for item in table["columns"] if item["type"] == "date"]
-        categories = [item for item in table["columns"] if item["type"] == "text" and item["unique_count"] <= 100]
+        numeric = [item for item in table["columns"] if item.get("role", "measure" if item["type"] in {"integer", "real"} else "") == "measure"]
+        dates = [item for item in table["columns"] if item.get("role", "time" if item["type"] == "date" else "") == "time"]
+        categories = [item for item in table["columns"] if item.get("role", "dimension" if item["type"] == "text" else "") == "dimension" and item["unique_count"] <= 100]
         matched_numeric = next((item for item in sorted(numeric, key=lambda value: -len(value["name"])) if item["name"] in question), None)
         matched_groups = [item for item in [*dates, *categories] if item["name"] in question and item is not matched_numeric]
         asks_count = any(marker in question for marker in ("多少条", "记录数", "行数", "数量")) and not matched_numeric
@@ -451,20 +516,51 @@ class UploadedDatasetAnalyzer:
         operation_label = {"count": "记录数", "sum": "合计", "avg": "平均值", "max": "最大值", "min": "最小值"}[operation]
         metric_label = "记录数" if operation == "count" else f"{metric['name']}{operation_label}"
         top_match = re.search(r"(?:前|top\s*)(\d+)", question, re.IGNORECASE)
+        where_clauses: list[str] = []
+        filter_labels: list[str] = []
+        for column in categories:
+            matched_value = next(
+                (value for value in sorted(column.get("sample_values", []), key=len, reverse=True) if value and value in question),
+                None,
+            )
+            if matched_value:
+                where_clauses.append(f"{_quote(column['sql_name'])} = {_literal(matched_value)}")
+                filter_labels.append(f"{column['name']}={matched_value}")
+        month_match = re.search(r"(20\d{2})\s*年\s*(1[0-2]|0?[1-9])\s*月", question)
+        year_match = re.search(r"(20\d{2})\s*年", question)
+        if dates and month_match:
+            year, month = int(month_match.group(1)), int(month_match.group(2))
+            next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+            date_sql = _quote(dates[0]["sql_name"])
+            where_clauses.extend([
+                f"date({date_sql}) >= date('{year:04d}-{month:02d}-01')",
+                f"date({date_sql}) < date('{next_year:04d}-{next_month:02d}-01')",
+            ])
+            filter_labels.append(f"{year}年{month}月")
+        elif dates and year_match:
+            year = int(year_match.group(1))
+            date_sql = _quote(dates[0]["sql_name"])
+            where_clauses.extend([
+                f"date({date_sql}) >= date('{year:04d}-01-01')",
+                f"date({date_sql}) < date('{year + 1:04d}-01-01')",
+            ])
+            filter_labels.append(f"{year}年")
         return {"operation": operation, "metric": metric, "metric_sql": metric_sql, "metric_label": metric_label,
                 "group": group, "group_sql": group_sql, "group_kind": group_kind, "group_label": group_label,
-                "limit": min(int(top_match.group(1)), 50) if top_match else 20}
+                "limit": min(int(top_match.group(1)), 50) if top_match else 20,
+                "where_clauses": where_clauses, "filter_labels": filter_labels}
 
     @staticmethod
     def _sql(table: dict[str, Any], plan: dict[str, Any]) -> str:
         select = f"{plan['metric_sql']} AS metric_value"
+        where = f" WHERE {' AND '.join(plan['where_clauses'])}" if plan["where_clauses"] else ""
         group = ""
         order = ""
         if plan["group_sql"]:
             select = f"{plan['group_sql']} AS group_value, {select}"
             group = f" GROUP BY {plan['group_sql']}"
             order = " ORDER BY metric_value DESC"
-        return f"SELECT {select} FROM {_quote(table['physical_table'])}{group}{order} LIMIT {plan['limit']}"
+        return f"SELECT {select} FROM {_quote(table['physical_table'])}{where}{group}{order} LIMIT {plan['limit']}"
 
     @staticmethod
     def _context(dataset: dict[str, Any], table: dict[str, Any], plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -473,14 +569,16 @@ class UploadedDatasetAnalyzer:
             "id": table["id"], "type": "dataset_schema", "title": f"{dataset['name']} · {table['sheet_name']}",
             "text": f"工作表共 {table['row_count']:,} 行，字段包括：{names}。",
             "score": 1.0, "keyword_score": 1.0, "vector_score": 1.0,
-            "match_reason": f"问题使用了当前数据集中的“{plan['metric_label']}”字段画像",
+            "match_reason": f"问题使用了当前数据集中的“{plan['metric_label']}”字段画像"
+                            + (f"，并应用筛选：{'、'.join(plan['filter_labels'])}" if plan["filter_labels"] else ""),
         }]
 
     @staticmethod
     def _answer(plan: dict[str, Any], rows: list[list[Any]]) -> str:
         if not rows:
             return "当前数据范围内没有可用于该分析的记录。"
+        scope = f"在{'、'.join(plan['filter_labels'])}范围内，" if plan["filter_labels"] else ""
         if plan["group_sql"]:
             first = rows[0]
-            return f"已按{plan['group_label']}统计{plan['metric_label']}，共返回 {len(rows)} 组；最高项为“{first[0]}”，结果为 {_format_number(first[1])}。"
-        return f"{plan['metric_label']}为 {_format_number(rows[0][0])}。"
+            return f"{scope}已按{plan['group_label']}统计{plan['metric_label']}，共返回 {len(rows)} 组；最高项为“{first[0]}”，结果为 {_format_number(first[1])}。"
+        return f"{scope}{plan['metric_label']}为 {_format_number(rows[0][0])}。"
